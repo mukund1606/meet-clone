@@ -21,6 +21,13 @@ const getLocalIp = () => {
 	return localIp;
 };
 
+const ANNOUNCED_IP = process.env.ANNOUNCED_IP
+	? process.env.ANNOUNCED_IP !== ''
+		? process.env.ANNOUNCED_IP
+		: getLocalIp()
+	: getLocalIp();
+
+console.log('ANNOUNCED_IP', ANNOUNCED_IP);
 export const config = {
 	app: {
 		port: 5000,
@@ -29,8 +36,8 @@ export const config = {
 		// Worker settings
 		numWorkers: Object.keys(os.cpus()).length,
 		worker: {
-			rtcMinPort: 10000,
-			rtcMaxPort: 10100,
+			rtcMinPort: 7000,
+			rtcMaxPort: 8000,
 			logLevel: 'debug' as WorkerLogLevel,
 			logTags: [
 				'info',
@@ -70,7 +77,7 @@ export const config = {
 			listenIps: [
 				{
 					ip: '0.0.0.0',
-					announcedIp: getLocalIp(), // replace by public IP address
+					announcedIp: ANNOUNCED_IP, // replace by public IP address
 				},
 			],
 			maxIncomingBitrate: 1500000,

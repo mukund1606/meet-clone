@@ -7,6 +7,7 @@ import {
 	RtpParameters,
 	Worker,
 } from 'mediasoup/node/lib/types';
+import * as io from 'socket.io';
 import {
 	ClientToServerEvents,
 	config,
@@ -14,8 +15,7 @@ import {
 	ServerToClientEvents,
 	SocketData,
 	WebSocketEventType,
-} from 'shared/lib/server';
-import * as io from 'socket.io';
+} from '../config/server';
 import { logger } from '../logger';
 import Peer from './Peer';
 

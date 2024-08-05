@@ -1,13 +1,13 @@
 import * as http from 'http';
+import * as io from 'socket.io';
+import { getMediasoupWorker } from '..';
 import {
 	ClientToServerEvents,
 	InterServerEvents,
 	ServerToClientEvents,
 	SocketData,
 	WebSocketEventType,
-} from 'shared/lib/server';
-import * as io from 'socket.io';
-import { getMediasoupWorker } from '..';
+} from '../config/server';
 import { logger } from '../logger';
 import Room from './Room';
 
@@ -143,7 +143,7 @@ export class SocketServer {
 											id: peer.id,
 											name: peer.name,
 											isAdmin: peer.isPeerAdmin(),
-										}
+									  }
 									: undefined,
 							}
 						);
@@ -170,7 +170,7 @@ export class SocketServer {
 										id: peer.id,
 										name: peer.name,
 										isAdmin: peer.isPeerAdmin(),
-									}
+								  }
 								: undefined,
 						}
 					);

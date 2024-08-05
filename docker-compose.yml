@@ -1,0 +1,37 @@
+services:
+  server:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        ANNOUNCED_IP: ${ANNOUNCED_IP}
+    environment:
+      - ANNOUNCED_IP=${ANNOUNCED_IP}
+    ports:
+      - '5000:5000'
+      - '7000-8000:7000-8000'
+    expose:
+      - 5000
+
+  client:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+        NEXTAUTH_URL: ${NEXTAUTH_URL}
+        LOGIN_USERNAME: ${LOGIN_USERNAME}
+        LOGIN_PASSWORD: ${LOGIN_PASSWORD}
+    ports:
+      - '8080:3000'
+    environment:
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - LOGIN_USERNAME=${LOGIN_USERNAME}
+      - LOGIN_PASSWORD=${LOGIN_PASSWORD}
+    depends_on:
+      - server
+    expose:
+      - 8080
+    env_file:
+      - .env

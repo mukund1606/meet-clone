@@ -31,6 +31,7 @@ export const env = createEnv({
    * `NEXT_PUBLIC_`.
    */
   client: {
+    NEXT_PUBLIC_WS_URL: z.string().url().default("ws://localhost:5000"),
     // NEXT_PUBLIC_CLIENTVAR: z.string(),
   },
 
@@ -44,6 +45,7 @@ export const env = createEnv({
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     LOGIN_USERNAME: process.env.LOGIN_USERNAME,
     LOGIN_PASSWORD: process.env.LOGIN_PASSWORD,
+    NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL,
     // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
   },
   /**

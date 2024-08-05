@@ -1,6 +1,6 @@
+import type { Peer, ProducerContainer } from "@/utils/client";
 import type { Consumer } from "mediasoup-client/lib/Consumer";
 import type { MediaKind } from "mediasoup-client/lib/RtpParameters";
-import type { Peer, ProducerContainer } from "shared/lib/common";
 
 export interface MergedData {
   userId: string;

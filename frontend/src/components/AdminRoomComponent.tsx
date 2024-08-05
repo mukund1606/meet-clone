@@ -42,13 +42,6 @@ import {
 declare let window: CustomWindow;
 
 import { mergeData, type MergedData, type RemoteStream } from "@/utils";
-import { Device } from "mediasoup-client";
-import type {
-  Consumer,
-  Producer,
-  RtpCapabilities,
-  Transport,
-} from "mediasoup-client/lib/types";
 import {
   config,
   WebSocketEventType,
@@ -58,7 +51,14 @@ import {
   type ProducerContainer,
   type ServerToClientEvents,
   type webRtcTransportParams,
-} from "shared/lib/client";
+} from "@/utils/client";
+import { Device } from "mediasoup-client";
+import type {
+  Consumer,
+  Producer,
+  RtpCapabilities,
+  Transport,
+} from "mediasoup-client/lib/types";
 import { io, type Socket } from "socket.io-client";
 import { toast } from "sonner";
 import { SelectSeparator } from "./ui/select";

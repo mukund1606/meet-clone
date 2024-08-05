@@ -1,6 +1,16 @@
 import { cn } from "@/lib/utils";
 import type { CustomWindow } from "@/types/customWindow";
 import { mergeData, type MergedData, type RemoteStream } from "@/utils";
+import {
+  type ClientToServerEvents,
+  config,
+  type ConsumerResult,
+  type Peer,
+  type ProducerContainer,
+  type ServerToClientEvents,
+  type webRtcTransportParams,
+  WebSocketEventType,
+} from "@/utils/client";
 import Avvvatars from "avvvatars-react";
 import {
   CameraIcon,
@@ -18,16 +28,6 @@ import type {
   Transport,
 } from "mediasoup-client/lib/types";
 import React, { memo, useEffect } from "react";
-import { config } from "shared/lib/client";
-import {
-  type ClientToServerEvents,
-  type ConsumerResult,
-  type Peer,
-  type ProducerContainer,
-  type ServerToClientEvents,
-  type webRtcTransportParams,
-  WebSocketEventType,
-} from "shared/lib/common";
 import { io, type Socket } from "socket.io-client";
 import { toast } from "sonner";
 import Loading from "./Loading";

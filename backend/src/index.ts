@@ -3,7 +3,7 @@ import express from 'express';
 import http from 'http';
 import * as mediasoup from 'mediasoup';
 import { Worker } from 'mediasoup/node/lib/Worker';
-import { config } from 'shared/lib/server';
+import { config } from './config/server';
 import { SocketServer } from './services/SocketServer';
 
 const app = express();
