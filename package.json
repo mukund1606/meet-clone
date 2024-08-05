@@ -1,0 +1,16 @@
+{
+	"name": "understanding-socketio",
+	"version": "1.0.0",
+	"main": "index.js",
+	"scripts": {
+		"server:dev": "pnpm --filter backend dev",
+		"server:build": "pnpm --filter backend build",
+		"server:start": "pnpm --filter backend start",
+		"client:dev": "pnpm --filter frontend dev",
+		"client:build": "pnpm --filter frontend build",
+		"client:start": "pnpm --filter frontend start",
+		"dev": "pnpm -r dev",
+		"build": "pnpm -r build",
+		"start": "pnpm -r start"
+	}
+}
