@@ -173,7 +173,9 @@ export default function AdminRoomComponent({
       });
 
       // TODO: Should I call getProducers here?
-      await getProducers(socket);
+      const producers = await getProducers(socket);
+      setProducers(producers.filter((p) => !p.isScreenShare));
+      setScreenProducers(producers.filter((p) => p.isScreenShare));
     } catch (error) {
       console.log("error creating consumer transport", error);
     }
@@ -376,7 +378,9 @@ export default function AdminRoomComponent({
     const data = await getRouterRTPCapabilties(socket);
     await loadDevice(data);
     await createConsumerTransport();
-    await getProducers(socket);
+    const producers = await getProducers(socket);
+    setProducers(producers.filter((p) => !p.isScreenShare));
+    setScreenProducers(producers.filter((p) => p.isScreenShare));
     await createProducerTransport();
   }, [roomId, createConsumerTransport, createProducerTransport, loadDevice]);
 
@@ -631,8 +635,8 @@ export default function AdminRoomComponent({
   // NOTE: Effects
   useEffect(() => {
     const socket: CustomSocket = io(
-      // "ws://localhost:5000",
-      "wss://server-meet-clone.mukund.page",
+      "ws://localhost:5000",
+      // "wss://server-meet-clone.mukund.page",
       {
         extraHeaders: {
           "data-name": name,
