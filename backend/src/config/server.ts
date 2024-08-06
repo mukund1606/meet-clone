@@ -26,7 +26,12 @@ const ANNOUNCED_IP = process.env.ANNOUNCED_IP
 		? process.env.ANNOUNCED_IP
 		: getLocalIp()
 	: getLocalIp();
+const MAX_PORT = process.env.MAX_PORT ? parseInt(process.env.MAX_PORT) : 10200;
+const MIN_PORT = process.env.MIN_PORT ? parseInt(process.env.MIN_PORT) : 10000;
 
+console.log('NUM_WORKERS', Object.keys(os.cpus()).length);
+console.log('MIN_PORT', MIN_PORT);
+console.log('MAX_PORT', MAX_PORT);
 console.log('ANNOUNCED_IP', ANNOUNCED_IP);
 export const config = {
 	app: {
@@ -36,8 +41,8 @@ export const config = {
 		// Worker settings
 		numWorkers: Object.keys(os.cpus()).length,
 		worker: {
-			rtcMinPort: process.env.MIN_PORT ? parseInt(process.env.MIN_PORT) : 10000,
-			rtcMaxPort: process.env.MAX_PORT ? parseInt(process.env.MAX_PORT) : 10100,
+			rtcMinPort: MIN_PORT,
+			rtcMaxPort: MAX_PORT,
 			logLevel: 'debug' as WorkerLogLevel,
 			logTags: [
 				'info',
