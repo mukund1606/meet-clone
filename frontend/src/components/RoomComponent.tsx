@@ -729,7 +729,7 @@ export default function RoomComponent({
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col gap-2 p-4">
+    <div className="relative flex min-h-[100dvh] flex-col gap-2 p-4">
       <div
         className={cn(
           "grid max-h-[calc(100vh-64px)] gap-2 overflow-x-auto",

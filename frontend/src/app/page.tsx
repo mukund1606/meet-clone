@@ -6,7 +6,7 @@ import Link from "next/link";
 export default async function Home() {
   const session = await getServerAuthSession();
   return (
-    <div className="flex h-screen w-screen flex-col gap-2 p-4">
+    <div className="flex h-[100dvh] w-screen flex-col gap-2 p-4">
       {session ? (
         <div className="ml-auto">
           <Button asChild>

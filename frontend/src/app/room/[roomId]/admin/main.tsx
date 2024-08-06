@@ -18,7 +18,7 @@ export default function AdminRoom({ roomId }: { roomId: string }) {
   });
   if (!name) {
     return (
-      <div className="flex min-h-screen">
+      <div className="flex min-h-[100dvh]">
         <Loading message="Loading..." />
       </div>
     );
