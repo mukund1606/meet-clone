@@ -298,6 +298,18 @@ export class SocketServer {
 				io.to(peerId).emit(WebSocketEventType.USER_KICKED, {
 					message: 'User removed from room',
 				});
+				const peer = room.removePeer(peerId);
+				io.to(this.getRoomAdminIds(socket.data.roomId ?? '')).emit(
+					WebSocketEventType.USER_LEFT,
+					{
+						message: `${socket.data.name} left the room`,
+						user: {
+							id: peer?.id ?? '',
+							name: peer?.name ?? '',
+							isAdmin: peer?.isPeerAdmin() ?? false,
+						},
+					}
+				);
 				cb({ type: 'success', res: 'User removed from room' });
 			});
 

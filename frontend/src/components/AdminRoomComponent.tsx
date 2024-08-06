@@ -1056,7 +1056,7 @@ export default function AdminRoomComponent({
                     className="rounded-none rounded-r-md"
                     variant={isAudioEnabled ? "destructive" : "default"}
                   >
-                    {isAudioEnabled ? <MicOffIcon /> : <MicIcon />}
+                    {isAudioEnabled ? <MicIcon /> : <MicOffIcon />}
                   </Button>
                 </div>
               </TooltipTrigger>
@@ -1106,7 +1106,7 @@ export default function AdminRoomComponent({
                     className="rounded-none rounded-r-md"
                     variant={isVideoEnabled ? "destructive" : "default"}
                   >
-                    {isVideoEnabled ? <CameraOffIcon /> : <CameraIcon />}
+                    {isVideoEnabled ? <CameraIcon /> : <CameraOffIcon />}
                   </Button>
                 </div>
               </TooltipTrigger>
