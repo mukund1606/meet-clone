@@ -1,25 +1,23 @@
 import { cn } from "@/lib/utils";
 import type { CustomWindow } from "@/types/customWindow";
-import { mergeData, type MergedData, type RemoteStream } from "@/utils";
+import { mergeData, type RemoteStream } from "@/utils";
 import {
-  type ClientToServerEvents,
-  // config,
   type ConsumerResult,
+  type CustomSocket,
   type Peer,
   type ProducerContainer,
-  type ServerToClientEvents,
   type webRtcTransportParams,
   WebSocketEventType,
 } from "@/utils/client";
-import Avvvatars from "avvvatars-react";
 import {
-  CameraIcon,
-  CameraOffIcon,
-  ChevronDownIcon,
-  MicIcon,
-  MicOffIcon,
-  PhoneOffIcon,
-} from "lucide-react";
+  closeProducer,
+  getInRoomUsers,
+  getProducers,
+  getRouterRTPCapabilties,
+  joinRoom,
+  requestMicAndCamAccess,
+} from "@/utils/helpers";
+import Avvvatars from "avvvatars-react";
 import { Device } from "mediasoup-client";
 import type {
   Consumer,
@@ -28,24 +26,12 @@ import type {
   Transport,
 } from "mediasoup-client/lib/types";
 import React, { memo, useEffect } from "react";
-import { io, type Socket } from "socket.io-client";
+import { io } from "socket.io-client";
 import { toast } from "sonner";
+import { AudioControl, EndControl, VideoControl } from "./Controls";
 import Loading from "./Loading";
-import { Button } from "./ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "./ui/tooltip";
+import NewPannel from "./NewPannel";
+import { TooltipProvider } from "./ui/tooltip";
 
 declare let window: CustomWindow;
 
@@ -56,21 +42,8 @@ export default function RoomComponent({
   roomId: string;
   name: string;
 }) {
-  // NOTE: Socket.io Ref
-  const socketRef = React.useRef<Socket<
-    ServerToClientEvents,
-    ClientToServerEvents
-  > | null>(null);
-  const [isWaitingRoom, setIsWaitingRoom] = React.useState(true);
-  const [roomUsers, setRoomUsers] = React.useState<Array<Peer>>([]);
-
-  const [remoteStreams, setRemoteStreams] = React.useState<RemoteStream[]>([]);
-  const [screenStreams, setScreenStreams] = React.useState<RemoteStream[]>([]);
-  const [producers, setProducers] = React.useState<ProducerContainer[]>([]);
-  const [screenProducers, setScreenProducers] = React.useState<
-    ProducerContainer[]
-  >([]);
-
+  // NOTE: Refs
+  const socketRef = React.useRef<CustomSocket | null>(null);
   const DeviceRef = React.useRef<Device | null>(null);
   const ProducerRef = React.useRef<Transport | null>(null);
   const ConsumerRef = React.useRef<Transport | null>(null);
@@ -78,40 +51,26 @@ export default function RoomComponent({
   const videoProducer = React.useRef<Producer | null>(null);
   const audioProducer = React.useRef<Producer | null>(null);
 
-  const joinRoom = React.useCallback(async (): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const socket = socketRef.current;
-      if (!socket) {
-        reject("Socket not connected");
-        return;
-      }
-      socket.emit(WebSocketEventType.JOIN_ROOM, { roomId: roomId }, (data) => {
-        if (data.type === "success") {
-          resolve(data.res);
-        } else {
-          reject(data.err);
-        }
-      });
-    });
-  }, [roomId]);
-
-  const getInRoomUsers = React.useCallback(async (): Promise<Array<Peer>> => {
-    return new Promise((resolve, reject) => {
-      const socket = socketRef.current;
-      if (!socket) {
-        reject("Socket not connected");
-        return;
-      }
-      socket.emit(WebSocketEventType.GET_IN_ROOM_USERS, (data) => {
-        if (data.type === "success") {
-          setRoomUsers(data.res);
-          resolve(data.res);
-        } else {
-          reject(data.err);
-        }
-      });
-    });
-  }, []);
+  // NOTE: States
+  const [isWaitingRoom, setIsWaitingRoom] = React.useState(true);
+  const [roomUsers, setRoomUsers] = React.useState<Array<Peer>>([]);
+  const [remoteStreams, setRemoteStreams] = React.useState<RemoteStream[]>([]);
+  const [screenStreams, setScreenStreams] = React.useState<RemoteStream[]>([]);
+  const [producers, setProducers] = React.useState<ProducerContainer[]>([]);
+  const [screenProducers, setScreenProducers] = React.useState<
+    ProducerContainer[]
+  >([]);
+  const [audioDevices, setAudioDevices] = React.useState<MediaDeviceInfo[]>([]);
+  const [videoDevices, setVideoDevices] = React.useState<MediaDeviceInfo[]>([]);
+  const [selectedAudioDevice, setSelectedAudioDevice] =
+    React.useState<MediaDeviceInfo>();
+  const [selectedVideoDevice, setSelectedVideoDevice] =
+    React.useState<MediaDeviceInfo>();
+  const [isAudioEnabled, setIsAudioEnabled] = React.useState(false);
+  const [isVideoEnabled, setIsVideoEnabled] = React.useState(false);
+  const [localStream, setLocalStream] = React.useState<MediaStream | null>(
+    null,
+  );
 
   // NOTE: To Check and Modify Later
   const loadDevice = React.useCallback(async (rtp: RtpCapabilities) => {
@@ -119,70 +78,25 @@ export default function RoomComponent({
       const device = new Device();
       await device.load({ routerRtpCapabilities: rtp });
       DeviceRef.current = device;
-      console.log("--- Device Loaded successfully with RTP capabilities ---");
+      // console.log("--- Device Loaded successfully with RTP capabilities ---");
       return;
     } else {
-      console.error(
-        "Couldn't load device. check socket or theres current active device",
-      );
+      // console.error(
+      //   "Couldn't load device. check socket or theres current active device",
+      // );
       return;
     }
-  }, []);
-
-  // NOTE: To Check and Modify Later
-  const getRouterRTPCapabilties = React.useCallback(async (): Promise<void> => {
-    const socket = socketRef.current;
-    if (!socket) {
-      console.error("Socket not connected");
-      return;
-    }
-    await new Promise((resolve, reject) => {
-      socket.emit(
-        WebSocketEventType.GET_ROUTER_RTP_CAPABILITIES,
-        async (data) => {
-          if (data.type === "success") {
-            await loadDevice(data.res);
-            resolve(data.res);
-          } else {
-            console.error(data.err);
-            reject(data.err);
-          }
-        },
-      );
-    });
-  }, [loadDevice]);
-
-  // NOTE: To Check and Modify Later
-  const getProducers = React.useCallback(async () => {
-    const producers: ProducerContainer[] = await new Promise(
-      (resolve, reject) => {
-        const socket = socketRef.current;
-        if (!socket) {
-          reject("Socket not connected");
-          return;
-        }
-        socket.emit(WebSocketEventType.GET_PRODUCERS, (data) => {
-          if (data.type === "success") {
-            resolve(data.res);
-          } else {
-            reject(data.err);
-          }
-        });
-      },
-    );
-    setProducers(producers.filter((p) => !p.isScreenShare));
-    setScreenProducers(producers.filter((p) => p.isScreenShare));
   }, []);
 
   // NOTE: To Check and Modify Later
   const createConsumerTransport = React.useCallback(async () => {
     const socket = socketRef.current;
     if (!socket) {
-      console.error("Socket not connected");
+      // console.error("Socket not connected");
       return;
     }
     if (ConsumerRef.current) {
-      console.log("Already initialized a consumer transport");
+      // console.log("Already initialized a consumer transport");
       return;
     }
     try {
@@ -195,7 +109,7 @@ export default function RoomComponent({
               if (response.type === "success") {
                 resolve({ params: response.res });
               } else {
-                console.error(response.err);
+                // console.error(response.err);
                 reject(response);
               }
             },
@@ -206,9 +120,9 @@ export default function RoomComponent({
       if (!data) {
         throw new Error("No Transport created");
       }
-      console.log("Consumer Transport :: ", data);
+      // console.log("Consumer Transport :: ", data);
       if (!DeviceRef.current || !socketRef.current) {
-        console.error("No device or socket found");
+        // console.error("No device or socket found");
         return;
       }
       ConsumerRef.current = DeviceRef.current.createRecvTransport(data.params);
@@ -231,9 +145,9 @@ export default function RoomComponent({
       });
 
       ConsumerRef.current.on("connectionstatechange", (state) => {
-        console.log("Consumer state", state);
+        // console.log("Consumer state", state);
         if (state === "connected") {
-          console.log("--- Connected Consumer Transport ---");
+          // console.log("--- Connected Consumer Transport ---");
         }
         if (state === "disconnected") {
           ConsumerRef.current?.close();
@@ -241,24 +155,21 @@ export default function RoomComponent({
       });
 
       // TODO: Should I call getProducers here?
-      await getProducers();
-      // (await sendRequest(WebSocketEventType.GET_PRODUCERS, {})) as {
-      //   producer_id: string;
-      // }[];
+      await getProducers(socket);
     } catch (error) {
       console.log("error creating consumer transport", error);
     }
-  }, [getProducers]);
+  }, []);
 
   // NOTE: To Check and Modify Later
   const createProducerTransport = React.useCallback(async () => {
     const socket = socketRef.current;
     if (!socket) {
-      console.error("Socket not connected");
+      // console.error("Socket not connected");
       return;
     }
     if (DeviceRef.current && socketRef.current) {
-      console.log("resp");
+      // console.log("resp");
       const resp: { params: webRtcTransportParams } = await new Promise(
         (resolve, reject) => {
           socket.emit(
@@ -277,11 +188,11 @@ export default function RoomComponent({
           );
         },
       );
-      console.log(resp);
+      // console.log(resp);
 
       ProducerRef.current = DeviceRef.current.createSendTransport(resp.params);
 
-      console.log("--- CREATE PRODUCER TRANSPORT ---");
+      // console.log("--- CREATE PRODUCER TRANSPORT ---");
 
       if (ProducerRef.current) {
         try {
@@ -304,21 +215,21 @@ export default function RoomComponent({
 
           ProducerRef.current.on(
             "produce",
-            ({ kind, rtpParameters }, cb, eb) => {
+            ({ kind, rtpParameters, appData }, cb, eb) => {
               socket.emit(
                 WebSocketEventType.PRODUCE,
                 {
                   producerTransportId: ProducerRef.current!.id,
                   kind,
                   rtpParameters,
-                  isScreenShare: false,
+                  isScreenShare: appData.isScreenShare ? true : false,
                 },
                 (data) => {
                   if (data.type === "success") {
-                    console.log(data.res.producer_id);
+                    // console.log(data.res.producer_id);
                     cb({ id: data.res.producer_id });
                   } else {
-                    console.error(data.err);
+                    // console.error(data.err);
                     eb(new Error(data.err));
                   }
                 },
@@ -327,10 +238,10 @@ export default function RoomComponent({
           );
 
           ProducerRef.current.on("connectionstatechange", (state) => {
-            console.log(state);
+            // console.log(state);
             switch (state) {
               case "disconnected":
-                console.log("Producer disconnected");
+                // console.log("Producer disconnected");
                 break;
             }
           });
@@ -343,29 +254,18 @@ export default function RoomComponent({
     }
   }, []);
 
-  const closeProducer = React.useCallback((producerId: string) => {
-    const socket = socketRef.current;
-    if (!socket) {
-      console.error("Socket not connected");
-      return;
-    }
-    socket.emit(WebSocketEventType.CLOSE_PRODUCER, {
-      producerId,
-    });
-  }, []);
-
   const getConsumerStream = React.useCallback(async (producerId: string) => {
     const socket = socketRef.current;
     if (!socket) {
-      console.error("Socket not connected");
+      // console.error("Socket not connected");
       return;
     }
     if (!DeviceRef.current) {
-      console.log("No device found");
+      // console.log("No device found");
       return;
     }
     if (!ConsumerRef.current) {
-      console.warn("No current consumer transport");
+      // console.warn("No current consumer transport");
       return;
     }
     const rtpCapabilities = DeviceRef.current.rtpCapabilities;
@@ -389,7 +289,7 @@ export default function RoomComponent({
 
     const { id, kind, rtpParameters } = data;
 
-    console.log("CONSUMER DATA :: ", data);
+    // console.log("CONSUMER DATA :: ", data);
 
     const consumer = await ConsumerRef.current.consume({
       id,
@@ -414,10 +314,10 @@ export default function RoomComponent({
       getConsumerStream(producerId)
         .then((data) => {
           if (!data) {
-            console.log("Couldn't load stream");
+            // console.log("Couldn't load stream");
             return;
           }
-          console.log("CONSUME STREAM DATA", data);
+          // console.log("CONSUME STREAM DATA", data);
 
           const { consumer, kind } = data;
           consumers.current.set(consumer.id, consumer);
@@ -437,15 +337,20 @@ export default function RoomComponent({
   );
 
   const initialLoad = React.useCallback(async () => {
+    const socket = socketRef.current;
+    if (!socket) {
+      console.error("Socket not connected");
+      return;
+    }
     try {
-      await joinRoom();
-    } catch (error) {
+      await joinRoom(socket, roomId);
+    } catch {
       toast.error("Error while joining the room");
       setTimeout(() => {
         window.location.assign("/");
-      }, 1500);
+      }, 2000);
     }
-  }, [joinRoom]);
+  }, [roomId]);
 
   const beforeunload = React.useCallback(async () => {
     async function leaveRoom() {
@@ -468,8 +373,102 @@ export default function RoomComponent({
     socketRef.current?.disconnect();
   }, []);
 
+  const handleAudioChange = (device: MediaDeviceInfo) => {
+    setSelectedAudioDevice(device);
+  };
+
+  const handleVideoChange = (device: MediaDeviceInfo) => {
+    setSelectedVideoDevice(device);
+  };
+
+  const toggleAudio = async () => {
+    if (!isAudioEnabled) {
+      await enableAudio();
+    } else {
+      await disableAudio();
+    }
+  };
+
+  const enableAudio = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        deviceId: selectedAudioDevice?.deviceId,
+      },
+    });
+    // TODO: This audio stream is to be used for audio producer
+    const audioStream = stream.getAudioTracks()[0];
+    if (ProducerRef.current) {
+      audioProducer.current = await ProducerRef.current.produce({
+        track: audioStream,
+      });
+    }
+
+    window.localAudioStream = stream;
+    setIsAudioEnabled(true);
+  };
+
+  const disableAudio = async () => {
+    if (window.localAudioStream) {
+      window.localAudioStream.getTracks().forEach((track) => track.stop());
+      window.localAudioStream = null;
+    }
+    if (audioProducer.current) {
+      const socket = socketRef.current;
+      if (!socket) {
+        // console.error("Socket not connected");
+        return;
+      }
+      closeProducer(socket, audioProducer.current.id);
+      audioProducer.current.close();
+    }
+    setIsAudioEnabled(false);
+  };
+
+  const toggleVideo = async () => {
+    if (!isVideoEnabled) {
+      await enableVideo();
+    } else {
+      await disableVideo();
+    }
+  };
+
+  const enableVideo = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        deviceId: selectedVideoDevice?.deviceId,
+      },
+    });
+    const videoStream = stream.getVideoTracks()[0];
+    if (ProducerRef.current) {
+      videoProducer.current = await ProducerRef.current.produce({
+        track: videoStream,
+      });
+    }
+    window.localStream = stream;
+    setLocalStream(stream);
+    setIsVideoEnabled(true);
+  };
+
+  const disableVideo = async () => {
+    if (window.localStream) {
+      window.localStream.getTracks().forEach((track) => track.stop());
+      window.localStream = null;
+    }
+    if (videoProducer.current) {
+      const socket = socketRef.current;
+      if (!socket) {
+        // console.error("Socket not connected");
+        return;
+      }
+      closeProducer(socket, videoProducer.current.id);
+      videoProducer.current.close();
+    }
+    setLocalStream(null);
+    setIsVideoEnabled(false);
+  };
+
   useEffect(() => {
-    const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
+    const socket: CustomSocket = io(
       // "ws://localhost:5000",
       "wss://server-meet-clone.mukund.page",
       {
@@ -483,23 +482,27 @@ export default function RoomComponent({
       socketRef.current = socket;
       await initialLoad();
 
-      socket.on(WebSocketEventType.USER_JOINED, (data) => {
+      socket.on(WebSocketEventType.USER_JOINED, async (data) => {
         toast.info(data.message);
-        void getInRoomUsers();
+        const users = await getInRoomUsers(socket);
+        setRoomUsers(users);
       });
 
-      socket.on(WebSocketEventType.USER_LEFT, (data) => {
+      socket.on(WebSocketEventType.USER_LEFT, async (data) => {
         toast.warning(data.message);
-        void getInRoomUsers();
+        const users = await getInRoomUsers(socket);
+        setRoomUsers(users);
       });
 
       socket.on(WebSocketEventType.USER_ACCEPTED, async () => {
         setIsWaitingRoom(false);
-        await getInRoomUsers();
+        const users = await getInRoomUsers(socket);
+        setRoomUsers(users);
         // NOTE: To Check and Modify Later
-        await getRouterRTPCapabilties();
+        const data = await getRouterRTPCapabilties(socket);
+        await loadDevice(data);
         await createConsumerTransport();
-        await getProducers();
+        await getProducers(socket);
         await createProducerTransport();
       });
 
@@ -538,13 +541,11 @@ export default function RoomComponent({
     };
   }, [
     name,
-    initialLoad,
     beforeunload,
-    getInRoomUsers,
-    getRouterRTPCapabilties,
     createConsumerTransport,
-    getProducers,
     createProducerTransport,
+    initialLoad,
+    loadDevice,
   ]);
 
   useEffect(() => {
@@ -559,43 +560,9 @@ export default function RoomComponent({
     });
   }, [screenProducers, roomId, name, consume]);
 
-  // NOTE: After Socket.io Ref
-  const [audioDevices, setAudioDevices] = React.useState<MediaDeviceInfo[]>([]);
-  const [videoDevices, setVideoDevices] = React.useState<MediaDeviceInfo[]>([]);
-
-  const [selectedAudioDevice, setSelectedAudioDevice] =
-    React.useState<MediaDeviceInfo>();
-  const [selectedVideoDevice, setSelectedVideoDevice] =
-    React.useState<MediaDeviceInfo>();
-
   useEffect(() => {
-    const isFirefox = () => {
-      return navigator.userAgent.toLowerCase().indexOf("firefox") > -1;
-    };
-    const requestAccess = async () => {
-      try {
-        let stream: MediaStream;
-        if (isFirefox()) {
-          const devices = await navigator.mediaDevices.enumerateDevices();
-          const device = devices[0];
-          stream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-            video: { deviceId: device?.deviceId },
-          });
-        } else {
-          stream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-            video: true,
-          });
-        }
-        stream?.getTracks?.().forEach((track) => track?.stop?.());
-        return stream;
-      } catch (error) {
-        return null;
-      }
-    };
     const getDevices = async () => {
-      await requestAccess();
+      await requestMicAndCamAccess();
       const devices = await navigator.mediaDevices.enumerateDevices();
       const audioDevices = devices.filter(
         (device) => device.kind === "audioinput",
@@ -638,96 +605,6 @@ export default function RoomComponent({
     };
   }, []);
 
-  const handleAudioChange = (device: MediaDeviceInfo) => {
-    setSelectedAudioDevice(device);
-  };
-
-  const handleVideoChange = (device: MediaDeviceInfo) => {
-    setSelectedVideoDevice(device);
-  };
-
-  const [isAudioEnabled, setIsAudioEnabled] = React.useState(false);
-  const [isVideoEnabled, setIsVideoEnabled] = React.useState(false);
-
-  const [localStream, setLocalStream] = React.useState<MediaStream | null>(
-    null,
-  );
-
-  const toggleAudio = async () => {
-    if (!isAudioEnabled) {
-      await enableAudio();
-    } else {
-      await disableAudio();
-    }
-  };
-
-  const enableAudio = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        deviceId: selectedAudioDevice?.deviceId,
-      },
-    });
-    const audioStream = stream.getAudioTracks()[0];
-    if (ProducerRef.current) {
-      audioProducer.current = await ProducerRef.current.produce({
-        track: audioStream,
-      });
-    }
-
-    window.localAudioStream = stream;
-    setIsAudioEnabled(true);
-  };
-
-  const disableAudio = async () => {
-    if (window.localAudioStream) {
-      window.localAudioStream.getTracks().forEach((track) => track.stop());
-      window.localAudioStream = null;
-    }
-    if (audioProducer.current) {
-      closeProducer(audioProducer.current.id);
-      audioProducer.current.close();
-    }
-    setIsAudioEnabled(false);
-  };
-
-  const toggleVideo = async () => {
-    if (!isVideoEnabled) {
-      await enableVideo();
-    } else {
-      await disableVideo();
-    }
-  };
-
-  const enableVideo = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        deviceId: selectedVideoDevice?.deviceId,
-      },
-    });
-    const videoStream = stream.getVideoTracks()[0];
-    if (ProducerRef.current) {
-      videoProducer.current = await ProducerRef.current.produce({
-        track: videoStream,
-      });
-    }
-    window.localStream = stream;
-    setLocalStream(stream);
-    setIsVideoEnabled(true);
-  };
-
-  const disableVideo = async () => {
-    if (window.localStream) {
-      window.localStream.getTracks().forEach((track) => track.stop());
-      window.localStream = null;
-    }
-    if (videoProducer.current) {
-      closeProducer(videoProducer.current.id);
-      videoProducer.current.close();
-    }
-    setLocalStream(null);
-    setIsVideoEnabled(false);
-  };
-
   return (
     <div className="relative flex min-h-[100dvh] flex-col gap-2 p-4">
       <div
@@ -764,125 +641,22 @@ export default function RoomComponent({
       {/* Controls */}
       <div className="fixed bottom-4 left-0 right-0 flex h-16 max-w-full flex-col overflow-x-auto p-2">
         <div className="mx-auto flex gap-4">
-          {/* Audio */}
           <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center rounded-lg border-2 bg-background">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        size="icon"
-                        className="w-fit rounded-none rounded-l-md"
-                        variant="ghost"
-                      >
-                        <ChevronDownIcon className="w-6" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuLabel>Audio Devices</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {audioDevices.map((device) => (
-                        <DropdownMenuItem
-                          key={device.deviceId}
-                          onClick={() => handleAudioChange(device)}
-                          className="flex items-center gap-1"
-                        >
-                          <MicIcon
-                            className={cn(
-                              "h-5 w-5 opacity-0",
-                              selectedAudioDevice?.deviceId ===
-                                device.deviceId && "opacity-100",
-                            )}
-                          />
-                          {device.label}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <Button
-                    size="icon"
-                    onClick={toggleAudio}
-                    className="rounded-none rounded-r-md"
-                    variant={isAudioEnabled ? "destructive" : "default"}
-                  >
-                    {isAudioEnabled ? <MicIcon /> : <MicOffIcon />}
-                  </Button>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Audio</p>
-              </TooltipContent>
-            </Tooltip>
-
-            {/* Video */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center rounded-lg border-2 bg-background">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        size="icon"
-                        className="w-fit rounded-none rounded-l-md"
-                        variant="ghost"
-                      >
-                        <ChevronDownIcon className="w-6" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuLabel>Video Devices</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {videoDevices.map((device) => (
-                        <DropdownMenuItem
-                          key={device.deviceId}
-                          onClick={() => handleVideoChange(device)}
-                          className="flex items-center gap-1"
-                        >
-                          <CameraIcon
-                            className={cn(
-                              "h-5 w-5 opacity-0",
-                              selectedVideoDevice?.deviceId ===
-                                device.deviceId && "opacity-100",
-                            )}
-                          />
-                          {device.label}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <Button
-                    size="icon"
-                    onClick={toggleVideo}
-                    className="rounded-none rounded-r-md"
-                    variant={isVideoEnabled ? "destructive" : "default"}
-                  >
-                    {isVideoEnabled ? <CameraIcon /> : <CameraOffIcon />}
-                  </Button>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Video</p>
-              </TooltipContent>
-            </Tooltip>
-
-            {/* End */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="rounded-lg border-2">
-                  <Button
-                    size="icon"
-                    className="rounded-md"
-                    variant="destructive"
-                    onClick={() => window.location.assign("/")}
-                  >
-                    <PhoneOffIcon />
-                  </Button>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Call End</p>
-              </TooltipContent>
-            </Tooltip>
+            <AudioControl
+              audioDevices={audioDevices}
+              handleAudioChange={handleAudioChange}
+              isAudioEnabled={isAudioEnabled}
+              selectedAudioDevice={selectedAudioDevice}
+              toggleAudio={toggleAudio}
+            />
+            <VideoControl
+              videoDevices={videoDevices}
+              handleVideoChange={handleVideoChange}
+              isVideoEnabled={isVideoEnabled}
+              selectedVideoDevice={selectedVideoDevice}
+              toggleVideo={toggleVideo}
+            />
+            <EndControl />
           </TooltipProvider>
         </div>
       </div>
@@ -936,49 +710,6 @@ function LocalUserComponent({
   );
 }
 
-// function ScreenShareComponent({
-//   name,
-//   stream,
-//   isLocal = false,
-//   className,
-// }: {
-//   name: string;
-//   stream: MediaStream | null;
-//   isLocal: boolean;
-//   className?: string;
-// }) {
-//   const screenVideoRef = React.useRef<HTMLVideoElement | null>(null);
-//   useEffect(() => {
-//     if (screenVideoRef.current) {
-//       screenVideoRef.current.srcObject = stream;
-//       void screenVideoRef.current.play();
-//       screenVideoRef.current.volume = isLocal ? 0 : 1;
-//       screenVideoRef.current.autoplay = true;
-//     }
-//   }, [stream, isLocal]);
-//   return (
-//     <div
-//       className={cn(
-//         "relative flex w-full items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
-//         className,
-//       )}
-//     >
-//       {stream ? (
-//         <video
-//           ref={screenVideoRef}
-//           autoPlay
-//           playsInline
-//           className="h-full w-full"
-//         />
-//       ) : (
-//         <>
-//           <Avvvatars value={name} size={95} />
-//         </>
-//       )}
-//     </div>
-//   );
-// }
-
 const ScreenCarousel = ({
   usersInRoom,
   remoteStreams,
@@ -999,17 +730,10 @@ const ScreenCarousel = ({
         <div
           key={user.userId}
           className={cn(
-            "relative flex h-[75vh] w-full items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
+            "relative flex max-h-[28vh] w-full items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
           )}
         >
-          <p className="absolute bottom-0 left-0 h-auto w-auto rounded-sm bg-black/20 p-1 px-3 text-lg">
-            {user.name}&apos;s Screen
-          </p>
-          {user.producers.length <= 0 ? (
-            <Avvvatars value={user.name} size={95} />
-          ) : (
-            <MemoizedScreenPannel user={user} />
-          )}
+          <MemoizedScreenPannel user={user} isScreenShare={true} />
         </div>
       ))}
     </>
@@ -1027,7 +751,6 @@ const UserCarousel = ({
   userId?: string;
 }) => {
   const users = mergeData(usersInRoom, remoteStreams, producerContainer);
-
   return (
     <>
       {users.map((user) => (
@@ -1037,100 +760,88 @@ const UserCarousel = ({
             "relative flex h-[28vh] items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
           )}
         >
-          <p className="absolute bottom-0 left-0 h-auto w-auto rounded-sm bg-black/20 p-1 px-3 text-lg">
-            {user.name}
-          </p>
-          {user.producers.length <= 0 ? (
-            <Avvvatars value={user.name} size={95} />
-          ) : (
-            <MemoizedUserPannel user={user} />
-          )}
+          <MemoizedUserPannel user={user} isScreenShare={false} />
         </div>
       ))}
     </>
   );
 };
 
-const UserPannel = ({ user }: { user: MergedData }) => {
-  const videoRef = React.useRef<HTMLVideoElement | null>(null);
-  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+// const UserPannel = ({ user }: { user: MergedData }) => {
+//   const videoRef = React.useRef<HTMLVideoElement | null>(null);
+//   const audioRef = React.useRef<HTMLAudioElement | null>(null);
 
-  useEffect(() => {
-    user.producers.forEach((producer) => {
-      if (producer.kind === "video" && videoRef.current) {
-        videoRef.current.srcObject = producer.stream;
-        void videoRef.current.play();
-        videoRef.current.volume = 0;
-        videoRef.current.autoplay = true;
-      } else if (producer.kind === "audio" && audioRef.current) {
-        audioRef.current.srcObject = producer.stream;
-        void audioRef.current.play();
-        audioRef.current.autoplay = true;
-      }
-    });
-  }, [user]);
+//   useEffect(() => {
+//     user.producers.forEach((producer) => {
+//       if (producer.kind === "video" && videoRef.current) {
+//         videoRef.current.srcObject = producer.stream;
+//         void videoRef.current.play();
+//         videoRef.current.volume = 0;
+//         videoRef.current.autoplay = true;
+//       } else if (producer.kind === "audio" && audioRef.current) {
+//         audioRef.current.srcObject = producer.stream;
+//         void audioRef.current.play();
+//         audioRef.current.autoplay = true;
+//       }
+//     });
+//   }, [user]);
 
-  if (!videoRef.current?.srcObject && audioRef.current?.srcObject) {
-    <>
-      <audio ref={audioRef} autoPlay />
-      <Avvvatars value={user.name} size={95} />
-    </>;
-  }
-  return (
-    <div className="h-full w-full">
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        className="h-full w-full object-cover"
-      />
-      <audio ref={audioRef} autoPlay playsInline />
-    </div>
-  );
-};
+//   if (!videoRef.current?.srcObject && audioRef.current?.srcObject) {
+//     <>
+//       <audio ref={audioRef} autoPlay />
+//       <Avvvatars value={user.name} size={95} />
+//     </>;
+//   }
+//   return (
+//     <div className="h-full w-full">
+//       <video
+//         ref={videoRef}
+//         autoPlay
+//         playsInline
+//         className="h-full w-full object-cover"
+//       />
+//       <audio ref={audioRef} autoPlay playsInline />
+//     </div>
+//   );
+// };
 
-const ScreenPannel = ({ user }: { user: MergedData }) => {
-  const videoRef = React.useRef<HTMLVideoElement | null>(null);
-  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+// const ScreenPannel = ({ user }: { user: MergedData }) => {
+//   const videoRef = React.useRef<HTMLVideoElement | null>(null);
+//   const audioRef = React.useRef<HTMLAudioElement | null>(null);
 
-  useEffect(() => {
-    user.producers.forEach((producer) => {
-      if (producer.kind === "video" && videoRef.current) {
-        videoRef.current.srcObject = producer.stream;
-        void videoRef.current.play();
-        videoRef.current.volume = 0;
-        videoRef.current.autoplay = true;
-      } else if (producer.kind === "audio" && audioRef.current) {
-        audioRef.current.srcObject = producer.stream;
-        void audioRef.current.play();
-        audioRef.current.autoplay = true;
-      }
-    });
-  }, [user]);
+//   useEffect(() => {
+//     user.producers.forEach((producer) => {
+//       if (producer.kind === "video" && videoRef.current) {
+//         videoRef.current.srcObject = producer.stream;
+//         void videoRef.current.play();
+//         videoRef.current.volume = 0;
+//         videoRef.current.autoplay = true;
+//       } else if (producer.kind === "audio" && audioRef.current) {
+//         audioRef.current.srcObject = producer.stream;
+//         void audioRef.current.play();
+//         audioRef.current.autoplay = true;
+//       }
+//     });
+//   }, [user]);
 
-  if (!videoRef.current?.srcObject && audioRef.current?.srcObject) {
-    <>
-      <audio ref={audioRef} autoPlay />
-      <Avvvatars value={user.name} size={95} />
-    </>;
-  }
-  return (
-    <div className="flex h-full">
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        className="object-center"
-        style={{
-          aspectRatio: videoRef.current
-            ? videoRef.current?.videoWidth / videoRef.current?.videoHeight
-            : undefined,
-        }}
-      />
-      <audio ref={audioRef} autoPlay playsInline />
-    </div>
-  );
-};
+//   if (!videoRef.current?.srcObject && audioRef.current?.srcObject) {
+//     <>
+//       <audio ref={audioRef} autoPlay />
+//       <Avvvatars value={user.name} size={95} />
+//     </>;
+//   }
+//   return (
+//     <div className="h-full w-full">
+//       <video
+//         ref={videoRef}
+//         autoPlay
+//         playsInline
+//         className="h-full w-full object-contain"
+//       />
+//       <audio ref={audioRef} autoPlay playsInline />
+//     </div>
+//   );
+// };
 
-const MemoizedUserPannel = memo(UserPannel);
-const MemoizedScreenPannel = memo(ScreenPannel);
+const MemoizedUserPannel = memo(NewPannel);
+const MemoizedScreenPannel = memo(NewPannel);

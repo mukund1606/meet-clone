@@ -12,6 +12,7 @@ const config = {
   ],
   rules: {
     "@typescript-eslint/prefer-function-type": "off",
+    "@typescript-eslint/prefer-promise-reject-errors": "off",
     "@typescript-eslint/array-type": "off",
     "@typescript-eslint/consistent-type-definitions": "off",
     "@typescript-eslint/consistent-type-imports": [

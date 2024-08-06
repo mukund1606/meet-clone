@@ -115,6 +115,7 @@ export class SocketServer {
 
 			// DONE: DISCONNECT EVENT
 			socket.on(WebSocketEventType.DISCONNECT, () => {
+				socket.leave(socket.data.roomId ?? '');
 				console.log(`${name} disconnected`);
 			});
 
@@ -382,6 +383,8 @@ export class SocketServer {
 				} else {
 					cb({ type: 'error', err: 'User not found' });
 				}
+				socket.leave(room.id);
+				socket.disconnect();
 			});
 
 			// NOTE: Modify Later
