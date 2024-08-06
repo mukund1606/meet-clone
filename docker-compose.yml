@@ -5,11 +5,15 @@ services:
       dockerfile: Dockerfile
       args:
         ANNOUNCED_IP: ${ANNOUNCED_IP}
+        MAX_PORT: ${MAX_PORT}
+        MIN_PORT: ${MIN_PORT}
     environment:
       - ANNOUNCED_IP=${ANNOUNCED_IP}
+      - MAX_PORT=${MAX_PORT}
+      - MIN_PORT=${MIN_PORT}
     ports:
       - '5000:5000'
-      - '7000-8000:7000-8000'
+      - '10000-10100:10000-10100'
     expose:
       - 5000
 
@@ -33,5 +37,3 @@ services:
       - server
     expose:
       - 8080
-    env_file:
-      - .env

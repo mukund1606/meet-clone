@@ -36,8 +36,8 @@ export const config = {
 		// Worker settings
 		numWorkers: Object.keys(os.cpus()).length,
 		worker: {
-			rtcMinPort: 7000,
-			rtcMaxPort: 8000,
+			rtcMinPort: process.env.MIN_PORT ? parseInt(process.env.MIN_PORT) : 10000,
+			rtcMaxPort: process.env.MAX_PORT ? parseInt(process.env.MAX_PORT) : 10100,
 			logLevel: 'debug' as WorkerLogLevel,
 			logTags: [
 				'info',
