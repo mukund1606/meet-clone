@@ -3,7 +3,7 @@ import type { CustomWindow } from "@/types/customWindow";
 import { mergeData, type MergedData, type RemoteStream } from "@/utils";
 import {
   type ClientToServerEvents,
-  config,
+  // config,
   type ConsumerResult,
   type Peer,
   type ProducerContainer,
@@ -470,7 +470,7 @@ export default function RoomComponent({
 
   useEffect(() => {
     const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
-      config.ws.url,
+      "wss://server.meet-clone.mukund.page",
       {
         extraHeaders: {
           "data-name": name,

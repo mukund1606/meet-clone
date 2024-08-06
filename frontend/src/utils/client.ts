@@ -1,8 +1,8 @@
-import { env } from "@/env";
+// import { env } from "@/env";
 
 export * from "./common";
-export const config = {
-  ws: {
-    url: env.NEXT_PUBLIC_WS_URL,
-  },
-};
+// export const config = {
+//   ws: {
+//     url: env.NEXT_PUBLIC_WS_URL,
+//   },
+// };

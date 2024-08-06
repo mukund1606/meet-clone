@@ -43,7 +43,7 @@ declare let window: CustomWindow;
 
 import { mergeData, type MergedData, type RemoteStream } from "@/utils";
 import {
-  config,
+  // config,
   WebSocketEventType,
   type ClientToServerEvents,
   type ConsumerResult,
@@ -599,7 +599,7 @@ export default function AdminRoomComponent({
 
   useEffect(() => {
     const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
-      config.ws.url,
+      "wss://server.meet-clone.mukund.page",
       {
         extraHeaders: {
           "data-name": name,

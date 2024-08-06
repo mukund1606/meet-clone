@@ -26,7 +26,7 @@ const ANNOUNCED_IP = process.env.ANNOUNCED_IP
 		? process.env.ANNOUNCED_IP
 		: getLocalIp()
 	: getLocalIp();
-const MAX_PORT = process.env.MAX_PORT ? parseInt(process.env.MAX_PORT) : 10200;
+const MAX_PORT = process.env.MAX_PORT ? parseInt(process.env.MAX_PORT) : 11000;
 const MIN_PORT = process.env.MIN_PORT ? parseInt(process.env.MIN_PORT) : 10000;
 
 console.log('NUM_WORKERS', Object.keys(os.cpus()).length);
