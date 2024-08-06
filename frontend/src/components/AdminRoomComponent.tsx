@@ -635,8 +635,8 @@ export default function AdminRoomComponent({
   // NOTE: Effects
   useEffect(() => {
     const socket: CustomSocket = io(
-      "ws://localhost:5000",
-      // "wss://server-meet-clone.mukund.page",
+      // "ws://localhost:5000",
+      "wss://server-meet-clone.mukund.page",
       {
         extraHeaders: {
           "data-name": name,

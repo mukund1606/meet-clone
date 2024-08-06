@@ -58,7 +58,7 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         try {
           LoginSchema.parse(credentials);
-        } catch (error) {
+        } catch {
           throw new Error("Invalid credentials");
         }
         const { username, password } = LoginSchema.parse(credentials);
