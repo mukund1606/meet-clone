@@ -11,10 +11,9 @@ services:
       - ANNOUNCED_IP=${ANNOUNCED_IP}
       - MAX_PORT=${MAX_PORT}
       - MIN_PORT=${MIN_PORT}
-    # ports:
-    #   - '5000:5000'
-    #   - '${MIN_PORT}-${MAX_PORT}:${MIN_PORT}-${MAX_PORT}'
+    ports:
+      - '5000:5000'
+      - '${MIN_PORT}-${MAX_PORT}:${MIN_PORT}-${MAX_PORT}'
     expose:
       - 5000
       - ${MIN_PORT}-${MAX_PORT}
-    network_mode: host
