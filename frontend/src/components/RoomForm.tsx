@@ -35,7 +35,7 @@ export default function RoomForm() {
   const router = useRouter();
   const [name, setName] = useLocalStorage<string>({
     key: "name",
-    defaultValue: "Guest",
+    defaultValue: "",
   });
 
   const form = useForm<z.infer<typeof RoomFormSchema>>({

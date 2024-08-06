@@ -643,7 +643,7 @@ export default function RoomComponent({
         </>
       ) : null}
       {/* Controls */}
-      <div className="fixed bottom-4 left-0 right-0 flex h-16 max-w-full flex-col overflow-x-auto p-2">
+      <div className="fixed bottom-4 left-0 right-0 z-50 flex h-16 max-w-full flex-col overflow-x-auto p-2">
         <div className="mx-auto flex gap-4">
           <TooltipProvider>
             <AudioControl
@@ -687,24 +687,26 @@ function LocalUserComponent({
   return (
     <div
       className={cn(
-        "relative flex h-[28vh] items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
+        "relative flex h-[clamp(12rem,16rem,40vh)] items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
       )}
     >
       {stream ? (
         <>
-          <p className="absolute bottom-0 left-0 h-auto w-auto rounded-sm bg-black/20 p-1 px-3 text-lg">
+          <p className="absolute bottom-0 left-0 h-auto w-auto rounded-sm bg-black/20 p-1 px-3 text-lg backdrop-blur-sm">
             You
           </p>
-          <video
-            ref={localVideoRef}
-            autoPlay
-            playsInline
-            className="h-full w-full object-cover"
-          />
+          <div className="flex h-full w-full items-center justify-center">
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              className="h-full w-full"
+            />
+          </div>
         </>
       ) : (
         <>
-          <p className="absolute bottom-0 left-0 h-auto w-auto rounded-sm bg-black/20 p-1 px-3 text-lg">
+          <p className="absolute bottom-0 left-0 h-auto w-auto rounded-sm bg-black/20 p-1 px-3 text-lg backdrop-blur-sm">
             You
           </p>
           <Avvvatars value={name} size={95} />
@@ -734,7 +736,7 @@ const ScreenCarousel = ({
         <div
           key={user.userId}
           className={cn(
-            "relative flex max-h-[28vh] w-full items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
+            "relative flex h-[clamp(15rem,35rem,75vh)] items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
           )}
         >
           <MemoizedScreenPannel user={user} isScreenShare={true} />
@@ -761,7 +763,7 @@ const UserCarousel = ({
         <div
           key={user.userId}
           className={cn(
-            "relative flex h-[28vh] items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
+            "relative flex h-[clamp(12rem,16rem,40vh)] items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
           )}
         >
           <MemoizedUserPannel user={user} isScreenShare={false} />
