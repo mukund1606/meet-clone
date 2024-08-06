@@ -79,7 +79,11 @@ export default function AdminRoomComponent({
   const [roomUsers, setRoomUsers] = React.useState<Array<Peer>>([]);
 
   const [remoteStreams, setRemoteStreams] = React.useState<RemoteStream[]>([]);
+  const [screenStreams, setScreenStreams] = React.useState<RemoteStream[]>([]);
   const [producers, setProducers] = React.useState<ProducerContainer[]>([]);
+  const [screenProducers, setScreenProducers] = React.useState<
+    ProducerContainer[]
+  >([]);
 
   const DeviceRef = React.useRef<Device | null>(null);
   const ProducerRef = React.useRef<Transport | null>(null);
@@ -228,7 +232,8 @@ export default function AdminRoomComponent({
         });
       },
     );
-    setProducers(producers);
+    setProducers(producers.filter((p) => !p.isScreenShare));
+    setScreenProducers(producers.filter((p) => p.isScreenShare));
   }, []);
 
   // NOTE: To Check and Modify Later
@@ -467,7 +472,7 @@ export default function AdminRoomComponent({
   }, []);
 
   const consume = React.useCallback(
-    async (producerId: string) => {
+    async (producerId: string, isScreenShare: boolean) => {
       getConsumerStream(producerId)
         .then((data) => {
           if (!data) {
@@ -479,7 +484,11 @@ export default function AdminRoomComponent({
           const { consumer, kind } = data;
           consumers.current.set(consumer.id, consumer);
           if (kind === "video" || kind === "audio") {
-            setRemoteStreams((v) => [...v, data]);
+            if (isScreenShare) {
+              setScreenStreams((v) => [...v, data]);
+            } else {
+              setRemoteStreams((v) => [...v, data]);
+            }
           }
         })
         .catch((error) => {
@@ -639,11 +648,18 @@ export default function AdminRoomComponent({
       });
 
       socket.on(WebSocketEventType.NEW_PRODUCERS, (data) => {
-        setProducers((v) => [...v, ...data]);
+        setProducers((v) => [...v, ...data.filter((p) => !p.isScreenShare)]);
+        setScreenProducers((v) => [
+          ...v,
+          ...data.filter((p) => p.isScreenShare),
+        ]);
       });
 
       socket.on(WebSocketEventType.PRODUCER_CLOSED, (data) => {
         setProducers((v) =>
+          v.filter((prod) => prod.producer_id !== data.producer_id),
+        );
+        setScreenProducers((v) =>
           v.filter((prod) => prod.producer_id !== data.producer_id),
         );
       });
@@ -660,9 +676,15 @@ export default function AdminRoomComponent({
 
   useEffect(() => {
     producers.forEach((producer) => {
-      void consume(producer.producer_id);
+      void consume(producer.producer_id, false);
     });
   }, [producers, roomId, name, consume]);
+
+  useEffect(() => {
+    screenProducers.forEach((producer) => {
+      void consume(producer.producer_id, true);
+    });
+  }, [screenProducers, roomId, name, consume]);
 
   // NOTE: After Socket.io Ref
   const [audioDevices, setAudioDevices] = React.useState<MediaDeviceInfo[]>([]);
@@ -975,6 +997,12 @@ export default function AdminRoomComponent({
             isLocal
           />
         )}
+        <ScreenCarousel
+          usersInRoom={roomUsers}
+          remoteStreams={screenStreams}
+          producerContainer={screenProducers}
+          userId={socketRef.current?.id}
+        />
         <LocalUserComponent name={name} stream={localStream} />
         <UserCarousel
           usersInRoom={roomUsers}
@@ -1258,6 +1286,43 @@ export default function AdminRoomComponent({
     </div>
   );
 }
+
+const ScreenCarousel = ({
+  usersInRoom,
+  remoteStreams,
+  producerContainer,
+}: {
+  usersInRoom: Peer[];
+  remoteStreams: RemoteStream[];
+  producerContainer: ProducerContainer[];
+  userId?: string;
+}) => {
+  const users = mergeData(usersInRoom, remoteStreams, producerContainer).filter(
+    (user) => user.producers.length > 0,
+  );
+
+  return (
+    <>
+      {users.map((user) => (
+        <div
+          key={user.userId}
+          className={cn(
+            "relative flex h-[28vh] items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
+          )}
+        >
+          <p className="absolute bottom-0 left-0 h-auto w-auto rounded-sm bg-black/20 p-1 px-3 text-lg">
+            {user.name}&apos;s Screen
+          </p>
+          {user.producers.length <= 0 ? (
+            <Avvvatars value={user.name} size={95} />
+          ) : (
+            <MemoizedUserPannel user={user} />
+          )}
+        </div>
+      ))}
+    </>
+  );
+};
 
 function LocalUserComponent({
   name,
