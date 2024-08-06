@@ -17,3 +17,4 @@ services:
     expose:
       - 5000
       - ${MIN_PORT}-${MAX_PORT}
+    network_mode: host

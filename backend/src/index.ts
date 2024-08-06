@@ -39,11 +39,12 @@ async function createWorkers() {
 	console.log('Total workers created', workers.length);
 }
 
-const port = process.env.PORT ?? 5000;
+const port = 5000;
 const server = http.createServer(app);
 new SocketServer(server);
 
-server.listen(port, () => {
+server.listen(port, '0.0.0.0', () => {
+	console.log(server.address());
 	console.log(`Server is running on port ${port}`);
 });
 
