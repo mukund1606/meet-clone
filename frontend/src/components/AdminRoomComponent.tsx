@@ -599,7 +599,8 @@ export default function AdminRoomComponent({
 
   useEffect(() => {
     const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
-      "wss://server.meet-clone.mukund.page",
+      // "ws://localhost:5000",
+      "wss://server-meet-clone.mukund.page",
       {
         extraHeaders: {
           "data-name": name,
