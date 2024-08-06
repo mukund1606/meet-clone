@@ -475,7 +475,7 @@ export default function RoomComponent({
       {
         extraHeaders: {
           "data-name": name,
-          "data-admin": "true",
+          "data-admin": "false",
         },
       },
     );
