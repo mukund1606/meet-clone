@@ -508,10 +508,21 @@ export default function AdminRoomComponent({
   };
 
   const enableScreenShare = async () => {
-    const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: true,
-      audio: true,
-    });
+    let stream: MediaStream | null = null;
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true,
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "NotAllowedError") {
+        toast.error("Please Select Screen To Share");
+        return;
+      }
+    }
+    if (!stream) {
+      return;
+    }
     // TODO: This screen stream is to be used for screen share producer
     const videoStream = stream.getVideoTracks()[0];
     if (!videoStream) return;
@@ -585,10 +596,21 @@ export default function AdminRoomComponent({
 
   const recordScreen = async () => {
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: true,
-      });
+      let stream: MediaStream | null = null;
+      try {
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: true,
+        });
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "NotAllowedError") {
+          toast.error("Please Select Screen To Record");
+          return;
+        }
+      }
+      if (!stream) {
+        return;
+      }
       setRecordingStream(stream);
       const videoStream = stream.getVideoTracks()[0];
       if (!videoStream) return;
