@@ -299,6 +299,10 @@ export class SocketServer {
 					message: 'User removed from room',
 				});
 				const peer = room.removePeer(peerId);
+				if (peer?.isPeerAdmin) {
+					cb({ type: 'error', err: 'You cannot kick an admin' });
+					return;
+				}
 				io.to(this.getRoomAdminIds(socket.data.roomId ?? '')).emit(
 					WebSocketEventType.USER_LEFT,
 					{

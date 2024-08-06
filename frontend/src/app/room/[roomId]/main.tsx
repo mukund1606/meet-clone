@@ -20,5 +20,5 @@ export default function Room({ roomId }: { roomId: string }) {
       </div>
     );
   }
-  return <RoomComponent roomId={roomId} name={name} />;
+  return <RoomComponent roomId={roomId.toLowerCase()} name={name} />;
 }

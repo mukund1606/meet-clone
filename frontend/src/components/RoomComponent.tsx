@@ -732,25 +732,29 @@ export default function RoomComponent({
     <div className="relative flex min-h-[100dvh] flex-col gap-2 p-4">
       <div
         className={cn(
-          "grid max-h-[calc(100vh-64px)] gap-2 overflow-x-auto",
+          "grid grid-cols-1 gap-2 overflow-x-auto",
           isWaitingRoom
-            ? "grid-cols-1 opacity-50 transition-opacity hover:opacity-100"
-            : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
+            ? "opacity-50 transition-opacity hover:opacity-100"
+            : "lg:grid-cols-3 xl:grid-cols-4",
         )}
       >
-        <ScreenCarousel
-          usersInRoom={roomUsers}
-          remoteStreams={screenStreams}
-          producerContainer={screenProducers}
-          userId={socketRef.current?.id}
-        />
-        <LocalUserComponent name={name} stream={localStream} />
-        <UserCarousel
-          usersInRoom={roomUsers}
-          remoteStreams={remoteStreams}
-          producerContainer={producers}
-          userId={socketRef.current?.id}
-        />
+        <div className="lg:col-span-3 xl:col-span-3">
+          <ScreenCarousel
+            usersInRoom={roomUsers}
+            remoteStreams={screenStreams}
+            producerContainer={screenProducers}
+            userId={socketRef.current?.id}
+          />
+        </div>
+        <div className="flex flex-col gap-2 lg:col-span-3 lg:grid lg:grid-cols-3 xl:col-span-1 xl:flex xl:flex-col">
+          <UserCarousel
+            usersInRoom={roomUsers}
+            remoteStreams={remoteStreams}
+            producerContainer={producers}
+            userId={socketRef.current?.id}
+          />
+          <LocalUserComponent name={name} stream={localStream} />
+        </div>
       </div>
       {isWaitingRoom ? (
         <>
@@ -758,7 +762,7 @@ export default function RoomComponent({
         </>
       ) : null}
       {/* Controls */}
-      <div className="absolute bottom-4 left-0 right-0 flex h-16 max-w-full flex-col overflow-x-auto p-2">
+      <div className="fixed bottom-4 left-0 right-0 flex h-16 max-w-full flex-col overflow-x-auto p-2">
         <div className="mx-auto flex gap-4">
           {/* Audio */}
           <TooltipProvider>
@@ -995,7 +999,7 @@ const ScreenCarousel = ({
         <div
           key={user.userId}
           className={cn(
-            "relative flex h-[28vh] items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
+            "relative flex h-[75vh] w-full items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
           )}
         >
           <p className="absolute bottom-0 left-0 h-auto w-auto rounded-sm bg-black/20 p-1 px-3 text-lg">
@@ -1004,7 +1008,7 @@ const ScreenCarousel = ({
           {user.producers.length <= 0 ? (
             <Avvvatars value={user.name} size={95} />
           ) : (
-            <MemoizedUserPannel user={user} />
+            <MemoizedScreenPannel user={user} />
           )}
         </div>
       ))}
@@ -1085,4 +1089,48 @@ const UserPannel = ({ user }: { user: MergedData }) => {
   );
 };
 
+const ScreenPannel = ({ user }: { user: MergedData }) => {
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    user.producers.forEach((producer) => {
+      if (producer.kind === "video" && videoRef.current) {
+        videoRef.current.srcObject = producer.stream;
+        void videoRef.current.play();
+        videoRef.current.volume = 0;
+        videoRef.current.autoplay = true;
+      } else if (producer.kind === "audio" && audioRef.current) {
+        audioRef.current.srcObject = producer.stream;
+        void audioRef.current.play();
+        audioRef.current.autoplay = true;
+      }
+    });
+  }, [user]);
+
+  if (!videoRef.current?.srcObject && audioRef.current?.srcObject) {
+    <>
+      <audio ref={audioRef} autoPlay />
+      <Avvvatars value={user.name} size={95} />
+    </>;
+  }
+  return (
+    <div className="flex h-full">
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        className="object-center"
+        style={{
+          aspectRatio: videoRef.current
+            ? videoRef.current?.videoWidth / videoRef.current?.videoHeight
+            : undefined,
+        }}
+      />
+      <audio ref={audioRef} autoPlay playsInline />
+    </div>
+  );
+};
+
 const MemoizedUserPannel = memo(UserPannel);
+const MemoizedScreenPannel = memo(ScreenPannel);

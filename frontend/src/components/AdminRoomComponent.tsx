@@ -989,7 +989,7 @@ export default function AdminRoomComponent({
 
   return (
     <div className="relative flex min-h-[100dvh] flex-col gap-2 p-4">
-      <div className="grid max-h-[calc(100vh-64px)] grid-cols-2 gap-2 overflow-x-auto md:grid-cols-3 lg:grid-cols-4">
+      <div className="grid max-h-[calc(100vh-64px)] gap-2 overflow-x-auto sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         {isScreenShareEnabled && (
           <ScreenShareComponent
             name="Screen"
@@ -1012,7 +1012,7 @@ export default function AdminRoomComponent({
         />
       </div>
       {/* Controls */}
-      <div className="absolute bottom-4 left-0 right-0 flex h-16 max-w-full flex-col overflow-x-auto p-2">
+      <div className="fixed bottom-4 left-0 right-0 flex h-16 max-w-full flex-col overflow-x-auto p-2">
         <div className="mx-auto flex gap-4">
           {/* Audio */}
           <TooltipProvider>
@@ -1287,43 +1287,6 @@ export default function AdminRoomComponent({
   );
 }
 
-const ScreenCarousel = ({
-  usersInRoom,
-  remoteStreams,
-  producerContainer,
-}: {
-  usersInRoom: Peer[];
-  remoteStreams: RemoteStream[];
-  producerContainer: ProducerContainer[];
-  userId?: string;
-}) => {
-  const users = mergeData(usersInRoom, remoteStreams, producerContainer).filter(
-    (user) => user.producers.length > 0,
-  );
-
-  return (
-    <>
-      {users.map((user) => (
-        <div
-          key={user.userId}
-          className={cn(
-            "relative flex h-[28vh] items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
-          )}
-        >
-          <p className="absolute bottom-0 left-0 h-auto w-auto rounded-sm bg-black/20 p-1 px-3 text-lg">
-            {user.name}&apos;s Screen
-          </p>
-          {user.producers.length <= 0 ? (
-            <Avvvatars value={user.name} size={95} />
-          ) : (
-            <MemoizedUserPannel user={user} />
-          )}
-        </div>
-      ))}
-    </>
-  );
-};
-
 function LocalUserComponent({
   name,
   stream,
@@ -1393,7 +1356,7 @@ function ScreenShareComponent({
   return (
     <div
       className={cn(
-        "relative flex w-full items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
+        "relative flex h-[28vh] w-full items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
         className,
       )}
     >
@@ -1413,6 +1376,43 @@ function ScreenShareComponent({
   );
 }
 
+const ScreenCarousel = ({
+  usersInRoom,
+  remoteStreams,
+  producerContainer,
+}: {
+  usersInRoom: Peer[];
+  remoteStreams: RemoteStream[];
+  producerContainer: ProducerContainer[];
+  userId?: string;
+}) => {
+  const users = mergeData(usersInRoom, remoteStreams, producerContainer).filter(
+    (user) => user.producers.length > 0,
+  );
+
+  return (
+    <>
+      {users.map((user) => (
+        <div
+          key={user.userId}
+          className={cn(
+            "relative flex max-h-[28vh] w-full items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
+          )}
+        >
+          <p className="absolute bottom-0 left-0 h-auto w-auto rounded-sm bg-black/20 p-1 px-3 text-lg">
+            {user.name}&apos;s Screen
+          </p>
+          {user.producers.length <= 0 ? (
+            <Avvvatars value={user.name} size={95} />
+          ) : (
+            <MemoizedScreenPannel user={user} />
+          )}
+        </div>
+      ))}
+    </>
+  );
+};
+
 const UserCarousel = ({
   usersInRoom,
   remoteStreams,
@@ -1424,7 +1424,6 @@ const UserCarousel = ({
   userId?: string;
 }) => {
   const users = mergeData(usersInRoom, remoteStreams, producerContainer);
-  // console.log("USERS", users);
 
   return (
     <>
@@ -1487,4 +1486,43 @@ const UserPannel = ({ user }: { user: MergedData }) => {
   );
 };
 
+const ScreenPannel = ({ user }: { user: MergedData }) => {
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    user.producers.forEach((producer) => {
+      if (producer.kind === "video" && videoRef.current) {
+        videoRef.current.srcObject = producer.stream;
+        void videoRef.current.play();
+        videoRef.current.volume = 0;
+        videoRef.current.autoplay = true;
+      } else if (producer.kind === "audio" && audioRef.current) {
+        audioRef.current.srcObject = producer.stream;
+        void audioRef.current.play();
+        audioRef.current.autoplay = true;
+      }
+    });
+  }, [user]);
+
+  if (!videoRef.current?.srcObject && audioRef.current?.srcObject) {
+    <>
+      <audio ref={audioRef} autoPlay />
+      <Avvvatars value={user.name} size={95} />
+    </>;
+  }
+  return (
+    <div className="h-full w-full">
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        className="h-full w-full object-contain"
+      />
+      <audio ref={audioRef} autoPlay playsInline />
+    </div>
+  );
+};
+
 const MemoizedUserPannel = memo(UserPannel);
+const MemoizedScreenPannel = memo(ScreenPannel);

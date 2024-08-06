@@ -23,5 +23,5 @@ export default function AdminRoom({ roomId }: { roomId: string }) {
       </div>
     );
   }
-  return <AdminRoomComponent roomId={roomId} name={name} />;
+  return <AdminRoomComponent roomId={roomId.toLowerCase()} name={name} />;
 }
