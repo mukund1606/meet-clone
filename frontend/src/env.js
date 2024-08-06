@@ -31,7 +31,7 @@ export const env = createEnv({
    * `NEXT_PUBLIC_`.
    */
   client: {
-    NEXT_PUBLIC_WS_URL: z.string().url().default("ws://localhost:5000"),
+    NEXT_PUBLIC_WS_URL: z.string().default("ws://localhost:5000"),
     // NEXT_PUBLIC_CLIENTVAR: z.string(),
   },
 
