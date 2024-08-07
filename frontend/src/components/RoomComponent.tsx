@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { CustomWindow } from "@/types/customWindow";
-import { mergeData, type RemoteStream } from "@/utils";
+import { type RemoteStream } from "@/utils";
 import {
   type ConsumerResult,
   type CustomSocket,
@@ -17,7 +17,6 @@ import {
   joinRoom,
   requestMicAndCamAccess,
 } from "@/utils/helpers";
-import Avvvatars from "avvvatars-react";
 import { Device } from "mediasoup-client";
 import type {
   Consumer,
@@ -25,12 +24,12 @@ import type {
   RtpCapabilities,
   Transport,
 } from "mediasoup-client/lib/types";
-import React, { memo, useEffect } from "react";
+import React, { useEffect } from "react";
 import { io } from "socket.io-client";
 import { toast } from "sonner";
 import { AudioControl, EndControl, VideoControl } from "./Controls";
 import Loading from "./Loading";
-import NewPannel from "./NewPannel";
+import { MemoizedLocalPannel, ScreenCarousel, UserCarousel } from "./NewPannel";
 import { TooltipProvider } from "./ui/tooltip";
 
 declare let window: CustomWindow;
@@ -679,7 +678,12 @@ export default function RoomComponent({
               userId={socketRef.current?.id}
             />
           )}
-          <LocalUserComponent name={name} stream={localStream} />
+          <MemoizedLocalPannel
+            name={name}
+            stream={localStream}
+            isAudioEnabled={isAudioEnabled}
+            isVideoEnabled={isVideoEnabled}
+          />
         </div>
       </div>
       {isWaitingRoom && !isDisconnected ? (
@@ -717,187 +721,3 @@ export default function RoomComponent({
     </div>
   );
 }
-
-function LocalUserComponent({
-  name,
-  stream,
-}: {
-  name: string;
-  stream: MediaStream | null;
-}) {
-  const localVideoRef = React.useRef<HTMLVideoElement | null>(null);
-  useEffect(() => {
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = stream;
-      void localVideoRef.current.play();
-      localVideoRef.current.volume = 0;
-      localVideoRef.current.autoplay = true;
-    }
-  }, [stream]);
-  return (
-    <div
-      className={cn(
-        "relative flex h-[clamp(12rem,16rem,40vh)] items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
-      )}
-    >
-      {stream ? (
-        <>
-          <p className="absolute bottom-0 left-0 h-auto w-auto rounded-sm bg-black/20 p-1 px-3 text-lg backdrop-blur-sm">
-            You
-          </p>
-          <div className="flex h-full w-full items-center justify-center">
-            <video
-              ref={localVideoRef}
-              autoPlay
-              playsInline
-              className="h-full w-full"
-            />
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="absolute bottom-0 left-0 h-auto w-auto rounded-sm bg-black/20 p-1 px-3 text-lg backdrop-blur-sm">
-            You
-          </p>
-          <Avvvatars value={name} size={95} />
-        </>
-      )}
-    </div>
-  );
-}
-
-const ScreenCarousel = ({
-  usersInRoom,
-  remoteStreams,
-  producerContainer,
-}: {
-  usersInRoom: Peer[];
-  remoteStreams: RemoteStream[];
-  producerContainer: ProducerContainer[];
-  userId?: string;
-}) => {
-  const users = mergeData(usersInRoom, remoteStreams, producerContainer).filter(
-    (user) => user.producers.length > 0,
-  );
-
-  return (
-    <>
-      {users.map((user) => (
-        <div
-          key={user.userId}
-          className={cn(
-            "relative flex h-[clamp(15rem,35rem,75vh)] items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
-          )}
-        >
-          <MemoizedScreenPannel user={user} isScreenShare={true} />
-        </div>
-      ))}
-    </>
-  );
-};
-
-const UserCarousel = ({
-  usersInRoom,
-  remoteStreams,
-  producerContainer,
-}: {
-  usersInRoom: Peer[];
-  remoteStreams: RemoteStream[];
-  producerContainer: ProducerContainer[];
-  userId?: string;
-}) => {
-  const users = mergeData(usersInRoom, remoteStreams, producerContainer);
-  return (
-    <>
-      {users.map((user) => (
-        <div
-          key={user.userId}
-          className={cn(
-            "relative flex h-[clamp(12rem,16rem,40vh)] items-center justify-center overflow-hidden rounded-sm border border-white/30 bg-black/10",
-          )}
-        >
-          <MemoizedUserPannel user={user} isScreenShare={false} />
-        </div>
-      ))}
-    </>
-  );
-};
-
-// const UserPannel = ({ user }: { user: MergedData }) => {
-//   const videoRef = React.useRef<HTMLVideoElement | null>(null);
-//   const audioRef = React.useRef<HTMLAudioElement | null>(null);
-
-//   useEffect(() => {
-//     user.producers.forEach((producer) => {
-//       if (producer.kind === "video" && videoRef.current) {
-//         videoRef.current.srcObject = producer.stream;
-//         void videoRef.current.play();
-//         videoRef.current.volume = 0;
-//         videoRef.current.autoplay = true;
-//       } else if (producer.kind === "audio" && audioRef.current) {
-//         audioRef.current.srcObject = producer.stream;
-//         void audioRef.current.play();
-//         audioRef.current.autoplay = true;
-//       }
-//     });
-//   }, [user]);
-
-//   if (!videoRef.current?.srcObject && audioRef.current?.srcObject) {
-//     <>
-//       <audio ref={audioRef} autoPlay />
-//       <Avvvatars value={user.name} size={95} />
-//     </>;
-//   }
-//   return (
-//     <div className="h-full w-full">
-//       <video
-//         ref={videoRef}
-//         autoPlay
-//         playsInline
-//         className="h-full w-full object-cover"
-//       />
-//       <audio ref={audioRef} autoPlay playsInline />
-//     </div>
-//   );
-// };
-
-// const ScreenPannel = ({ user }: { user: MergedData }) => {
-//   const videoRef = React.useRef<HTMLVideoElement | null>(null);
-//   const audioRef = React.useRef<HTMLAudioElement | null>(null);
-
-//   useEffect(() => {
-//     user.producers.forEach((producer) => {
-//       if (producer.kind === "video" && videoRef.current) {
-//         videoRef.current.srcObject = producer.stream;
-//         void videoRef.current.play();
-//         videoRef.current.volume = 0;
-//         videoRef.current.autoplay = true;
-//       } else if (producer.kind === "audio" && audioRef.current) {
-//         audioRef.current.srcObject = producer.stream;
-//         void audioRef.current.play();
-//         audioRef.current.autoplay = true;
-//       }
-//     });
-//   }, [user]);
-
-//   if (!videoRef.current?.srcObject && audioRef.current?.srcObject) {
-//     <>
-//       <audio ref={audioRef} autoPlay />
-//       <Avvvatars value={user.name} size={95} />
-//     </>;
-//   }
-//   return (
-//     <div className="h-full w-full">
-//       <video
-//         ref={videoRef}
-//         autoPlay
-//         playsInline
-//         className="h-full w-full object-contain"
-//       />
-//       <audio ref={audioRef} autoPlay playsInline />
-//     </div>
-//   );
-// };
-
-const MemoizedUserPannel = memo(NewPannel);
-const MemoizedScreenPannel = memo(NewPannel);
