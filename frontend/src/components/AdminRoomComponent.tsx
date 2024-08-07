@@ -38,6 +38,7 @@ import {
   UsersControl,
   VideoControl,
 } from "./Controls";
+import Loading from "./Loading";
 import NewPannel from "./NewPannel";
 import { TooltipProvider } from "./ui/tooltip";
 
@@ -61,6 +62,7 @@ export default function AdminRoomComponent({
   const screenAudioProducer = React.useRef<Producer | null>(null);
 
   // NOTE: States
+  const [isDisconnected, setIsDisconnected] = React.useState(false);
   const [waitingRoomUsers, setWaitingRoomUsers] = React.useState<Array<Peer>>(
     [],
   );
@@ -656,8 +658,10 @@ export default function AdminRoomComponent({
 
   // NOTE: Effects
   useEffect(() => {
+    let isDisconnected = false;
     const socket: CustomSocket = io(
       // "ws://localhost:5000",
+      // "wss://192.168.29.49:5000",
       "wss://server-meet-clone.mukund.page",
       {
         extraHeaders: {
@@ -666,61 +670,96 @@ export default function AdminRoomComponent({
         },
       },
     );
+
+    socket.io.on("reconnect", () => {
+      toast.info("You have been reconnected");
+      setTimeout(() => {
+        setIsDisconnected(false);
+        isDisconnected = false;
+      }, 500);
+    });
+
+    socket.on(WebSocketEventType.DISCONNECT, () => {
+      setIsDisconnected(true);
+      isDisconnected = true;
+      // Clearing Refs
+      DeviceRef.current = null;
+      ProducerRef.current = null;
+      ConsumerRef.current = null;
+      consumers.current = new Map();
+      videoProducer.current = null;
+      audioProducer.current = null;
+      screenProducer.current = null;
+      screenAudioProducer.current = null;
+
+      // Clearing states
+      setRemoteStreams([]);
+      setScreenStreams([]);
+    });
+
     socket.on("connect", async () => {
       socketRef.current = socket;
       void initialLoad();
-
-      socket.on(WebSocketEventType.USER_JOINED, async (data) => {
-        toast.info(data.message);
-        const users = await getInRoomUsers(socket);
-        setRoomUsers(users);
-      });
-
-      socket.on(WebSocketEventType.USER_ACCEPTED, async (data) => {
-        toast.info(data.message);
-        const [waitingRoomUsers, roomUsers] = await Promise.all([
-          getInWaitingRoomUsers(socket),
-          getInRoomUsers(socket),
-        ]);
-        setWaitingRoomUsers(waitingRoomUsers);
-        setRoomUsers(roomUsers);
-      });
-
-      socket.on(WebSocketEventType.USER_JOINED_WAITING_ROOM, async (data) => {
-        toast.info(data.message);
-        const waitingRoomUsers = await getInWaitingRoomUsers(socket);
-        setWaitingRoomUsers(waitingRoomUsers);
-      });
-
-      socket.on(WebSocketEventType.USER_LEFT, async (data) => {
-        toast.warning(data.message);
-        const users = await getInRoomUsers(socket);
-        setRoomUsers(users);
-      });
-
-      socket.on(WebSocketEventType.USER_LEFT_WAITING_ROOM, async (data) => {
-        toast.warning(data.message);
-        const waitingRoomUsers = await getInWaitingRoomUsers(socket);
-        setWaitingRoomUsers(waitingRoomUsers);
-      });
-
-      socket.on(WebSocketEventType.NEW_PRODUCERS, (data) => {
-        setProducers((v) => [...v, ...data.filter((p) => !p.isScreenShare)]);
-        setScreenProducers((v) => [
-          ...v,
-          ...data.filter((p) => p.isScreenShare),
-        ]);
-      });
-
-      socket.on(WebSocketEventType.PRODUCER_CLOSED, (data) => {
-        setProducers((v) =>
-          v.filter((prod) => prod.producer_id !== data.producer_id),
-        );
-        setScreenProducers((v) =>
-          v.filter((prod) => prod.producer_id !== data.producer_id),
-        );
-      });
     });
+
+    socket.on(WebSocketEventType.USER_JOINED, async (data) => {
+      if (!isDisconnected) {
+        toast.info(data.message);
+      }
+      const users = await getInRoomUsers(socket);
+      setRoomUsers(users);
+    });
+
+    socket.on(WebSocketEventType.USER_ACCEPTED, async (data) => {
+      if (!isDisconnected) {
+        toast.info(data.message);
+      }
+      const [waitingRoomUsers, roomUsers] = await Promise.all([
+        getInWaitingRoomUsers(socket),
+        getInRoomUsers(socket),
+      ]);
+      setWaitingRoomUsers(waitingRoomUsers);
+      setRoomUsers(roomUsers);
+    });
+
+    socket.on(WebSocketEventType.USER_JOINED_WAITING_ROOM, async (data) => {
+      if (!isDisconnected) {
+        toast.warning(data.message);
+      }
+      const waitingRoomUsers = await getInWaitingRoomUsers(socket);
+      setWaitingRoomUsers(waitingRoomUsers);
+    });
+
+    socket.on(WebSocketEventType.USER_LEFT, async (data) => {
+      if (!isDisconnected) {
+        toast.warning(data.message);
+      }
+      const users = await getInRoomUsers(socket);
+      setRoomUsers(users);
+    });
+
+    socket.on(WebSocketEventType.USER_LEFT_WAITING_ROOM, async (data) => {
+      if (!isDisconnected) {
+        toast.warning(data.message);
+      }
+      const waitingRoomUsers = await getInWaitingRoomUsers(socket);
+      setWaitingRoomUsers(waitingRoomUsers);
+    });
+
+    socket.on(WebSocketEventType.NEW_PRODUCERS, (data) => {
+      setProducers((v) => [...v, ...data.filter((p) => !p.isScreenShare)]);
+      setScreenProducers((v) => [...v, ...data.filter((p) => p.isScreenShare)]);
+    });
+
+    socket.on(WebSocketEventType.PRODUCER_CLOSED, (data) => {
+      setProducers((v) =>
+        v.filter((prod) => prod.producer_id !== data.producer_id),
+      );
+      setScreenProducers((v) =>
+        v.filter((prod) => prod.producer_id !== data.producer_id),
+      );
+    });
+
     const handleUnload = () => {
       void beforeunload();
     };
@@ -789,8 +828,8 @@ export default function AdminRoomComponent({
   }, []);
 
   return (
-    <div className="relative flex min-h-[100dvh] flex-col gap-2 p-4">
-      <div className="grid max-h-[calc(100vh-64px)] gap-2 overflow-x-auto sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+    <div className="relative flex min-h-[100dvh] flex-col gap-2 p-4 pb-24">
+      <div className="grid gap-2 overflow-x-auto sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         {isScreenShareEnabled && (
           <ScreenShareComponent
             name="Screen"
@@ -798,22 +837,31 @@ export default function AdminRoomComponent({
             isLocal
           />
         )}
-        <ScreenCarousel
-          usersInRoom={roomUsers}
-          remoteStreams={screenStreams}
-          producerContainer={screenProducers}
-          userId={socketRef.current?.id}
-        />
+        {!isDisconnected && (
+          <ScreenCarousel
+            usersInRoom={roomUsers}
+            remoteStreams={screenStreams}
+            producerContainer={screenProducers}
+            userId={socketRef.current?.id}
+          />
+        )}
         <LocalUserComponent name={name} stream={localStream} />
-        <UserCarousel
-          usersInRoom={roomUsers}
-          remoteStreams={remoteStreams}
-          producerContainer={producers}
-          userId={socketRef.current?.id}
-        />
+        {!isDisconnected && (
+          <UserCarousel
+            usersInRoom={roomUsers}
+            remoteStreams={remoteStreams}
+            producerContainer={producers}
+            userId={socketRef.current?.id}
+          />
+        )}
       </div>
+      {isDisconnected && (
+        <>
+          <Loading message="You have been disconnected..." />
+        </>
+      )}
       {/* Controls */}
-      <div className="fixed bottom-4 left-0 right-0 z-50 flex h-16 max-w-full flex-col overflow-x-auto p-2">
+      <div className="fixed bottom-4 left-0 right-0 z-50 flex h-16 max-w-full flex-col p-2">
         <div className="mx-auto flex gap-2 sm:gap-4">
           <TooltipProvider>
             <AudioControl

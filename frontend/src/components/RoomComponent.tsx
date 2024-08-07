@@ -52,6 +52,7 @@ export default function RoomComponent({
   const audioProducer = React.useRef<Producer | null>(null);
 
   // NOTE: States
+  const [isDisconnected, setIsDisconnected] = React.useState(false);
   const [isWaitingRoom, setIsWaitingRoom] = React.useState(true);
   const [roomUsers, setRoomUsers] = React.useState<Array<Peer>>([]);
   const [remoteStreams, setRemoteStreams] = React.useState<RemoteStream[]>([]);
@@ -372,6 +373,7 @@ export default function RoomComponent({
       });
     }
     await leaveRoom();
+    setIsWaitingRoom(true);
     socketRef.current?.disconnect();
   }, []);
 
@@ -470,8 +472,10 @@ export default function RoomComponent({
   };
 
   useEffect(() => {
+    let isDisconnected = false;
     const socket: CustomSocket = io(
       // "ws://localhost:5000",
+      // "wss://192.168.29.49:5000",
       "wss://server-meet-clone.mukund.page",
       {
         extraHeaders: {
@@ -480,61 +484,92 @@ export default function RoomComponent({
         },
       },
     );
+
+    socket.on(WebSocketEventType.DISCONNECT, () => {
+      setIsDisconnected(true);
+      isDisconnected = true;
+      // Clearing Refs
+      DeviceRef.current = null;
+      ProducerRef.current = null;
+      ConsumerRef.current = null;
+      consumers.current = new Map();
+      videoProducer.current = null;
+      audioProducer.current = null;
+
+      // Clearing states
+      setRemoteStreams([]);
+      setScreenStreams([]);
+    });
+
+    socket.io.on("reconnect", () => {
+      toast.info("You have been reconnected");
+      setTimeout(() => {
+        setIsDisconnected(false);
+        setIsWaitingRoom(true);
+        isDisconnected = false;
+      }, 500);
+    });
+
     socket.on("connect", async () => {
       socketRef.current = socket;
       await initialLoad();
-
-      socket.on(WebSocketEventType.USER_JOINED, async (data) => {
-        toast.info(data.message);
-        const users = await getInRoomUsers(socket);
-        setRoomUsers(users);
-      });
-
-      socket.on(WebSocketEventType.USER_LEFT, async (data) => {
-        toast.warning(data.message);
-        const users = await getInRoomUsers(socket);
-        setRoomUsers(users);
-      });
-
-      socket.on(WebSocketEventType.USER_ACCEPTED, async () => {
-        setIsWaitingRoom(false);
-        const users = await getInRoomUsers(socket);
-        setRoomUsers(users);
-        // NOTE: To Check and Modify Later
-        const data = await getRouterRTPCapabilties(socket);
-        await loadDevice(data);
-        await createConsumerTransport();
-        const producers = await getProducers(socket);
-        setProducers(producers.filter((p) => !p.isScreenShare));
-        setScreenProducers(producers.filter((p) => p.isScreenShare));
-        await createProducerTransport();
-      });
-
-      socket.on(WebSocketEventType.USER_REJECTED, () => {
-        window.location.assign("/");
-      });
-
-      socket.on(WebSocketEventType.USER_KICKED, () => {
-        window.location.assign("/");
-      });
-
-      socket.on(WebSocketEventType.NEW_PRODUCERS, (data) => {
-        setProducers((v) => [...v, ...data.filter((p) => !p.isScreenShare)]);
-        setScreenProducers((v) => [
-          ...v,
-          ...data.filter((p) => p.isScreenShare),
-        ]);
-      });
-
-      socket.on(WebSocketEventType.PRODUCER_CLOSED, (data) => {
-        setProducers((v) =>
-          v.filter((prod) => prod.producer_id !== data.producer_id),
-        );
-        setScreenProducers((v) =>
-          v.filter((prod) => prod.producer_id !== data.producer_id),
-        );
-      });
     });
+
+    socket.on(WebSocketEventType.USER_JOINED, async (data) => {
+      if (!isDisconnected) {
+        toast.info(data.message);
+      }
+      const users = await getInRoomUsers(socket);
+      setRoomUsers(users);
+    });
+
+    socket.on(WebSocketEventType.USER_LEFT, async (data) => {
+      if (!isDisconnected) {
+        toast.info(data.message);
+      }
+      const users = await getInRoomUsers(socket);
+      setRoomUsers(users);
+    });
+
+    socket.on(WebSocketEventType.USER_ACCEPTED, async () => {
+      setIsWaitingRoom(false);
+      if (!isDisconnected) {
+        toast.info("You've been accepted");
+      }
+      const users = await getInRoomUsers(socket);
+      setRoomUsers(users);
+      // NOTE: To Check and Modify Later
+      const data = await getRouterRTPCapabilties(socket);
+      await loadDevice(data);
+      await createConsumerTransport();
+      const producers = await getProducers(socket);
+      setProducers(producers.filter((p) => !p.isScreenShare));
+      setScreenProducers(producers.filter((p) => p.isScreenShare));
+      await createProducerTransport();
+    });
+
+    socket.on(WebSocketEventType.USER_REJECTED, () => {
+      window.location.assign("/");
+    });
+
+    socket.on(WebSocketEventType.USER_KICKED, () => {
+      window.location.assign("/");
+    });
+
+    socket.on(WebSocketEventType.NEW_PRODUCERS, (data) => {
+      setProducers((v) => [...v, ...data.filter((p) => !p.isScreenShare)]);
+      setScreenProducers((v) => [...v, ...data.filter((p) => p.isScreenShare)]);
+    });
+
+    socket.on(WebSocketEventType.PRODUCER_CLOSED, (data) => {
+      setProducers((v) =>
+        v.filter((prod) => prod.producer_id !== data.producer_id),
+      );
+      setScreenProducers((v) =>
+        v.filter((prod) => prod.producer_id !== data.producer_id),
+      );
+    });
+
     const handleUnload = () => {
       void beforeunload();
     };
@@ -610,7 +645,7 @@ export default function RoomComponent({
   }, []);
 
   return (
-    <div className="relative flex min-h-[100dvh] flex-col gap-2 p-4">
+    <div className="relative flex min-h-[100dvh] flex-col gap-2 p-4 pb-24">
       <div
         className={cn(
           "grid grid-cols-1 gap-2 overflow-x-auto",
@@ -620,28 +655,37 @@ export default function RoomComponent({
         )}
       >
         <div className="lg:col-span-3 xl:col-span-3">
-          <ScreenCarousel
-            usersInRoom={roomUsers}
-            remoteStreams={screenStreams}
-            producerContainer={screenProducers}
-            userId={socketRef.current?.id}
-          />
+          {!isDisconnected && (
+            <ScreenCarousel
+              usersInRoom={roomUsers}
+              remoteStreams={screenStreams}
+              producerContainer={screenProducers}
+              userId={socketRef.current?.id}
+            />
+          )}
         </div>
         <div className="flex flex-col gap-2 lg:col-span-3 lg:grid lg:grid-cols-3 xl:col-span-1 xl:flex xl:flex-col">
-          <UserCarousel
-            usersInRoom={roomUsers}
-            remoteStreams={remoteStreams}
-            producerContainer={producers}
-            userId={socketRef.current?.id}
-          />
+          {!isDisconnected && (
+            <UserCarousel
+              usersInRoom={roomUsers}
+              remoteStreams={remoteStreams}
+              producerContainer={producers}
+              userId={socketRef.current?.id}
+            />
+          )}
           <LocalUserComponent name={name} stream={localStream} />
         </div>
       </div>
-      {isWaitingRoom ? (
+      {isWaitingRoom && !isDisconnected ? (
         <>
           <Loading message="Wait for the host to accept you..." />
         </>
       ) : null}
+      {isDisconnected && (
+        <>
+          <Loading message="You have been disconnected..." />
+        </>
+      )}
       {/* Controls */}
       <div className="fixed bottom-4 left-0 right-0 z-50 flex h-16 max-w-full flex-col overflow-x-auto p-2">
         <div className="mx-auto flex gap-4">

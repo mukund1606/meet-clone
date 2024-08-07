@@ -27,6 +27,9 @@ export class SocketServer {
 			cors: {
 				origin: '*',
 			},
+			// 10 seconds
+			pingTimeout: 7000,
+			pingInterval: 3000,
 		});
 		this._roomList = new Map();
 		this._waitingRoomList = new Map();
@@ -79,6 +82,7 @@ export class SocketServer {
 			console.log(`${name} Connected`);
 			socket.data.isAdmin = isAdmin;
 			socket.data.name = name;
+			console.log('Connected:', socket.id, socket.data.name);
 
 			// DONE: CREATE ROOM EVENT(ADMIN ONLY)
 			socket.on(WebSocketEventType.CREATE_ROOM, ({ roomId }, cb) => {
@@ -115,8 +119,68 @@ export class SocketServer {
 
 			// DONE: DISCONNECT EVENT
 			socket.on(WebSocketEventType.DISCONNECT, () => {
-				socket.leave(socket.data.roomId ?? '');
+				console.log('Disconnected:', socket.id, socket.data.name);
 				console.log(`${name} disconnected`);
+				// Remove socket from room after 5 seconds
+				console.log(`${name} exiting room`);
+				if (!socket.data.roomId) {
+					return;
+				}
+				const room = this._roomList.get(socket.data.roomId);
+				const waitingRoom = this._waitingRoomList.get(
+					`waitingRoom-${socket.data.roomId}`
+				);
+				if (!room || !waitingRoom) {
+					return;
+				}
+				const peer = room.removePeer(socket.id);
+				const waitingPeer = waitingRoom.removePeer(socket.id);
+				if (peer) {
+					if (socket.data.isAdmin) {
+						const peersInRoom = Array.from(room._peers.values()).filter(
+							(p) => p.id !== socket.id
+						);
+						if (peersInRoom.length <= 0) {
+							console.log('No peers in room');
+							return;
+						}
+						io.to(peersInRoom.map((p) => p.id)).emit(
+							WebSocketEventType.USER_LEFT,
+							{
+								message: `${socket.data.name} got disconnected.`,
+								user: {
+									id: peer.id,
+									name: peer.name,
+									isAdmin: peer.isPeerAdmin(),
+								},
+							}
+						);
+					} else {
+						io.to(this.getRoomAdminIds(socket.data.roomId)).emit(
+							WebSocketEventType.USER_LEFT,
+							{
+								message: `${socket.data.name} got disconnected.`,
+								user: {
+									id: peer.id,
+									name: peer.name,
+									isAdmin: peer.isPeerAdmin(),
+								},
+							}
+						);
+					}
+				} else if (waitingPeer) {
+					io.to(this.getRoomAdminIds(socket.data.roomId)).emit(
+						WebSocketEventType.USER_LEFT_WAITING_ROOM,
+						{
+							message: `${socket.data.name} got disconnected.`,
+							user: {
+								id: waitingPeer.id,
+								name: waitingPeer.name,
+								isAdmin: false,
+							},
+						}
+					);
+				}
 			});
 
 			// DONE: JOIN ROOM EVENT
@@ -320,7 +384,7 @@ export class SocketServer {
 
 			// DONE: EXIT ROOM EVENT
 			socket.on(WebSocketEventType.EXIT_ROOM, (cb) => {
-				console.log(`${name} exiting room`);
+				console.log('Exiting Room:', socket.id, socket.data.name);
 				if (!socket.data.roomId) {
 					cb({ type: 'error', err: 'No Room Id provided to exit room' });
 					return;
@@ -335,6 +399,11 @@ export class SocketServer {
 				}
 				const peer = room.removePeer(socket.id);
 				const waitingPeer = waitingRoom.removePeer(socket.id);
+				if (room._peers.size === 0) {
+					console.log('Last user left room', socket.data.roomId);
+					this._roomList.delete(socket.data.roomId);
+					this._waitingRoomList.delete(`waitingRoom-${socket.data.roomId}`);
+				}
 				if (peer) {
 					if (socket.data.isAdmin) {
 						const peersInRoom = Array.from(room._peers.values()).filter(
@@ -383,8 +452,6 @@ export class SocketServer {
 				} else {
 					cb({ type: 'error', err: 'User not found' });
 				}
-				socket.leave(room.id);
-				socket.disconnect();
 			});
 
 			// NOTE: Modify Later

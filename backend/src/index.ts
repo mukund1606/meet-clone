@@ -47,8 +47,7 @@ const port = 5000;
 const server = http.createServer(app);
 new SocketServer(server);
 
-server.listen(port, '0.0.0.0', () => {
-	console.log(server.address());
+server.listen(port, () => {
 	console.log(`Server is running on port ${port}`);
 });
 
