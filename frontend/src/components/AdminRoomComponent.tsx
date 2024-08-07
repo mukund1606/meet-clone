@@ -622,12 +622,20 @@ export default function AdminRoomComponent({
       screenProducer.current = null;
       screenAudioProducer.current = null;
 
+      
       // Clearing states
+      setWaitingRoomUsers([]);
+      setRoomUsers([]);
       setRemoteStreams([]);
       setScreenStreams([]);
+      setProducers([]);
+      setScreenProducers([]);
+      setLocalStream(null);
+      setLocalScreenStream(null);
 
       await disableAudio();
       await disableVideo();
+      await disableScreenShare();
     });
 
     socket.on("connect", async () => {

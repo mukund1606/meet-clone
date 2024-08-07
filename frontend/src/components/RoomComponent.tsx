@@ -496,8 +496,13 @@ export default function RoomComponent({
       audioProducer.current = null;
 
       // Clearing states
+      setRoomUsers([]);
       setRemoteStreams([]);
       setScreenStreams([]);
+      setProducers([]);
+      setScreenProducers([]);
+      setLocalStream(null);
+
       await disableAudio();
       await disableVideo();
     });
