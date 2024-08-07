@@ -87,10 +87,6 @@ export default function AdminRoomComponent({
   );
   const [localScreenStream, setLocalScreenStream] =
     React.useState<MediaStream | null>(null);
-  const [isRecording, setIsRecording] = React.useState(false);
-  const [recorder, setRecorder] = React.useState<MediaRecorder | null>(null);
-  const [recordingStream, setRecordingStream] =
-    React.useState<MediaStream | null>(null);
 
   // NOTE: To Check and Modify Later
   const loadDevice = React.useCallback(async (rtp: RtpCapabilities) => {
@@ -339,8 +335,6 @@ export default function AdminRoomComponent({
             // console.log("Couldn't load stream");
             return;
           }
-          // console.log("CONSUME STREAM DATA", data);
-
           const { consumer, kind } = data;
           consumers.current.set(consumer.id, consumer);
           if (kind === "video" || kind === "audio") {
@@ -588,74 +582,6 @@ export default function AdminRoomComponent({
     setIsScreenShareEnabled(false);
   };
 
-  const handleRecording = async () => {
-    if (!isRecording) {
-      await recordScreen();
-    } else {
-      await stopRecording();
-    }
-  };
-
-  const recordScreen = async () => {
-    try {
-      let stream: MediaStream | null = null;
-      try {
-        stream = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
-          audio: true,
-        });
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "NotAllowedError") {
-          toast.error("Please Select Screen To Record");
-          return;
-        }
-      }
-      if (!stream) {
-        return;
-      }
-      setRecordingStream(stream);
-      const videoStream = stream.getVideoTracks()[0];
-      if (!videoStream) return;
-      videoStream.onended = async () => {
-        await stopRecording();
-      };
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: "video/webm",
-      });
-      setRecorder(mediaRecorder);
-      const chunks: BlobPart[] = [];
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunks.push(e.data);
-        }
-      };
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: "video/webm" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "video.webm";
-        a.click();
-        URL.revokeObjectURL(url);
-      };
-      mediaRecorder.start();
-      setIsRecording(true);
-    } catch (error) {
-      console.error("Error recording screen:", error);
-    }
-  };
-
-  const stopRecording = async () => {
-    if (recorder) {
-      recorder.stop();
-    }
-    if (recordingStream) {
-      recordingStream.getTracks().forEach((track) => track.stop());
-      setRecordingStream(null);
-    }
-    setIsRecording(false);
-  };
-
   // NOTE: Effects
   useEffect(() => {
     let isDisconnected = false;
@@ -757,6 +683,12 @@ export default function AdminRoomComponent({
       );
       setScreenProducers((v) =>
         v.filter((prod) => prod.producer_id !== data.producer_id),
+      );
+      setRemoteStreams((v) =>
+        v.filter((s) => s.producerId !== data.producer_id),
+      );
+      setScreenStreams((v) =>
+        v.filter((s) => s.producerId !== data.producer_id),
       );
     });
 
@@ -882,10 +814,7 @@ export default function AdminRoomComponent({
               isScreenShareEnabled={isScreenShareEnabled}
               toggleScreenShare={toggleScreenShare}
             />
-            <RecordingControl
-              isRecording={isRecording}
-              toggleRecording={handleRecording}
-            />
+            <RecordingControl />
             <UsersControl
               socket={socketRef.current}
               roomUsers={roomUsers}

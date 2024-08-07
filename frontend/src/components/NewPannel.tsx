@@ -12,6 +12,7 @@ export default function NewPannel({
   isScreenShare: boolean;
 }) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  // const audioElement = React.useMemo(() => new Audio(), []);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
   const [currentVideo, setCurrentVideo] = React.useState<MediaStream | null>(
     null,
@@ -84,9 +85,24 @@ export default function NewPannel({
   return (
     <div className="relative h-full w-full">
       <div className="flex h-full w-full items-center justify-center">
-        <video ref={videoRef} autoPlay playsInline className="h-full w-full" />
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          className="h-full w-full"
+          id={`video-${user.name}-${user.userId}`}
+          data-name={user.name}
+          data-id={user.userId}
+        />
       </div>
-      <audio ref={audioRef} autoPlay playsInline />
+      <audio
+        ref={audioRef}
+        autoPlay
+        playsInline
+        id={`audio-${user.name}-${user.userId}`}
+        data-name={user.name}
+        data-id={user.userId}
+      />
       <p className="absolute bottom-0 left-0 z-10 h-auto w-auto rounded-sm bg-black/20 p-1 px-3 text-lg text-white">
         {isScreenShare ? `${user.name}'s Screen` : user.name}
       </p>

@@ -568,6 +568,12 @@ export default function RoomComponent({
       setScreenProducers((v) =>
         v.filter((prod) => prod.producer_id !== data.producer_id),
       );
+      setRemoteStreams((v) =>
+        v.filter((s) => s.producerId !== data.producer_id),
+      );
+      setScreenStreams((v) =>
+        v.filter((s) => s.producerId !== data.producer_id),
+      );
     });
 
     const handleUnload = () => {

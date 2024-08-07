@@ -18,6 +18,7 @@ import {
   UsersRoundIcon,
 } from "lucide-react";
 import React, { memo } from "react";
+import { toast } from "sonner";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -228,44 +229,114 @@ function ScreenShareControlComponent({
 
 export const ScreenShareControl = memo(ScreenShareControlComponent);
 
-function RecordingControlComponent({
-  isRecording,
-  toggleRecording,
-}: {
-  isRecording: boolean;
-  toggleRecording: () => Promise<void>;
-}) {
+function RecordingControlComponent() {
   const [isDisabled, setIsDisabled] = React.useState(false);
+  const [recorder, setRecorder] = React.useState<MediaRecorder | null>(null);
+  const [recordingStream, setRecordingStream] =
+    React.useState<MediaStream | null>(null);
+  const [isRecording, setIsRecording] = React.useState(false);
+
+  const handleRecording = async () => {
+    if (!isRecording) {
+      await recordScreen();
+    } else {
+      await stopRecording();
+    }
+  };
+
+  const recordScreen = async () => {
+    try {
+      let stream: MediaStream | null = null;
+      try {
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: true,
+          // @ts-expect-error - This is a temporary fix for the issue
+          preferCurrentTab: true,
+        });
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "NotAllowedError") {
+          toast.error("Please Select Screen To Record");
+          return;
+        }
+      }
+      if (!stream) {
+        return;
+      }
+      setRecordingStream(stream);
+      const videoStream = stream.getVideoTracks()[0];
+      if (!videoStream) return;
+      videoStream.onended = async () => {
+        await stopRecording();
+      };
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: "video/webm",
+      });
+      setRecorder(mediaRecorder);
+      const chunks: BlobPart[] = [];
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunks.push(e.data);
+        }
+      };
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: "video/webm" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "video.webm";
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Error recording screen:", error);
+    }
+  };
+
+  const stopRecording = async () => {
+    if (recorder) {
+      recorder.stop();
+    }
+    if (recordingStream) {
+      recordingStream.getTracks().forEach((track) => track.stop());
+      setRecordingStream(null);
+    }
+    setIsRecording(false);
+  };
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div className="rounded-lg border-2">
-          <Button
-            size="icon"
-            className="rounded-md"
-            variant={isRecording ? "destructive" : "default"}
-            onClick={async () => {
-              if (isDisabled) {
-                return;
-              }
-              setIsDisabled(true);
-              await toggleRecording();
-              setIsDisabled(false);
-            }}
-            disabled={isDisabled}
-          >
-            {isRecording ? (
-              <Disc3Icon className="animate-spin" />
-            ) : (
-              <DiscIcon />
-            )}
-          </Button>
-        </div>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>Recording</p>
-      </TooltipContent>
-    </Tooltip>
+    <>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="rounded-lg border-2">
+            <Button
+              size="icon"
+              className="rounded-md"
+              variant={isRecording ? "destructive" : "default"}
+              onClick={async () => {
+                if (isDisabled) {
+                  return;
+                }
+                setIsDisabled(true);
+                await handleRecording();
+                setIsDisabled(false);
+              }}
+              disabled={isDisabled}
+            >
+              {isRecording ? (
+                <Disc3Icon className="animate-spin" />
+              ) : (
+                <DiscIcon />
+              )}
+            </Button>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Recording</p>
+        </TooltipContent>
+      </Tooltip>
+    </>
   );
 }
 
@@ -368,74 +439,81 @@ function UsersControlComponent({
           </Button>
         </div>
       </SheetTrigger>
-      <SheetContent>
-        <SheetHeader>
-          <SheetTitle>Waiting User</SheetTitle>
-          <div className="flex flex-col gap-2">
-            {waitingRoomUsers
-              ?.sort((a, b) => a.name.localeCompare(b.name))
-              .map((user, index) => (
-                <div
-                  key={user.id}
-                  className="flex items-center justify-between"
-                >
-                  <p className="text-lg font-semibold text-white">
-                    {index + 1}. {user.name}
-                  </p>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="default"
-                      size="icon"
-                      className="h-fit w-fit p-1 px-1.5"
-                      onClick={() => {
-                        void acceptUser(user.id);
-                      }}
-                    >
-                      Accept
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      className="h-fit w-fit p-1 px-1.5"
-                      onClick={() => {
-                        void rejectUser(user.id);
-                      }}
-                    >
-                      Reject
-                    </Button>
+      <SheetContent className="p-1">
+        <SheetHeader className="h-8"></SheetHeader>
+        <div className="flex flex-col gap-2">
+          <div className="p-2">
+            <SheetTitle className="text-xl underline">Waiting User</SheetTitle>
+            <div className="flex flex-col gap-2 pt-8">
+              {waitingRoomUsers
+                ?.sort((a, b) => a.name.localeCompare(b.name))
+                .map((user, index) => (
+                  <div
+                    key={user.id}
+                    className="flex items-center justify-between"
+                  >
+                    <p className="text-lg font-semibold text-white">
+                      {index + 1}. {user.name}
+                    </p>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="default"
+                        size="icon"
+                        className="h-fit w-fit p-1 px-1.5"
+                        onClick={() => {
+                          void acceptUser(user.id);
+                        }}
+                      >
+                        Accept
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="h-fit w-fit p-1 px-1.5"
+                        onClick={() => {
+                          void rejectUser(user.id);
+                        }}
+                      >
+                        Reject
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+            </div>
           </div>
           <SelectSeparator />
-          <SheetTitle>Joined User</SheetTitle>
-          <div className="flex flex-col gap-2">
-            {roomUsers
-              ?.sort((a, b) => a.name.localeCompare(b.name))
-              .map((user, index) => (
-                <div
-                  key={user.id}
-                  className="flex items-center justify-between"
-                >
-                  <p className="text-lg font-semibold text-white">
-                    {index + 1}. {user.name}
-                  </p>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      className="h-fit w-fit p-1 px-1.5"
-                      onClick={() => {
-                        void removeUser(user.id);
-                      }}
-                    >
-                      Remove
-                    </Button>
+          <div className="p-2">
+            <SheetTitle className="text-xl underline">Joined User</SheetTitle>
+            <div className="flex flex-col gap-2 pt-8">
+              {roomUsers
+                ?.sort((a, b) => a.name.localeCompare(b.name))
+                .map((user, index) => (
+                  <div
+                    key={user.id}
+                    className="flex items-center justify-between"
+                  >
+                    <p className="text-lg font-semibold text-white">
+                      {index + 1}. {user.name}
+                    </p>
+                    {!user.isAdmin ? (
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="h-fit w-fit p-1 px-1.5"
+                        onClick={() => {
+                          void removeUser(user.id);
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    ) : (
+                      <p className="px-1.5 tracking-wide">(Admin)</p>
+                    )}
                   </div>
-                </div>
-              ))}
+                ))}
+            </div>
           </div>
-        </SheetHeader>
+        </div>
       </SheetContent>
     </Sheet>
   );

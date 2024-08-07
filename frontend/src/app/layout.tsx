@@ -22,7 +22,7 @@ export default function RootLayout({
               richColors
               closeButton
               duration={3000}
-              position="top-right"
+              position="top-left"
             />
           </HydrateClient>
         </TRPCReactProvider>
