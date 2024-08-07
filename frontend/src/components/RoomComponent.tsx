@@ -484,7 +484,7 @@ export default function RoomComponent({
       },
     );
 
-    socket.on(WebSocketEventType.DISCONNECT, () => {
+    socket.on(WebSocketEventType.DISCONNECT, async () => {
       setIsDisconnected(true);
       isDisconnected = true;
       // Clearing Refs
@@ -498,6 +498,8 @@ export default function RoomComponent({
       // Clearing states
       setRemoteStreams([]);
       setScreenStreams([]);
+      await disableAudio();
+      await disableVideo();
     });
 
     socket.io.on("reconnect", () => {
@@ -566,12 +568,6 @@ export default function RoomComponent({
       );
       setScreenProducers((v) =>
         v.filter((prod) => prod.producer_id !== data.producer_id),
-      );
-      setRemoteStreams((v) =>
-        v.filter((s) => s.producerId !== data.producer_id),
-      );
-      setScreenStreams((v) =>
-        v.filter((s) => s.producerId !== data.producer_id),
       );
     });
 

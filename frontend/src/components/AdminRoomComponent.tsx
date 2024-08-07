@@ -609,7 +609,7 @@ export default function AdminRoomComponent({
       }, 500);
     });
 
-    socket.on(WebSocketEventType.DISCONNECT, () => {
+    socket.on(WebSocketEventType.DISCONNECT, async () => {
       setIsDisconnected(true);
       isDisconnected = true;
       // Clearing Refs
@@ -625,6 +625,9 @@ export default function AdminRoomComponent({
       // Clearing states
       setRemoteStreams([]);
       setScreenStreams([]);
+
+      await disableAudio();
+      await disableVideo();
     });
 
     socket.on("connect", async () => {
@@ -687,12 +690,6 @@ export default function AdminRoomComponent({
       );
       setScreenProducers((v) =>
         v.filter((prod) => prod.producer_id !== data.producer_id),
-      );
-      setRemoteStreams((v) =>
-        v.filter((s) => s.producerId !== data.producer_id),
-      );
-      setScreenStreams((v) =>
-        v.filter((s) => s.producerId !== data.producer_id),
       );
     });
 
