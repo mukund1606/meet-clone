@@ -21,7 +21,7 @@ export default function RootLayout({
             <Toaster
               richColors
               closeButton
-              duration={2000}
+              duration={3000}
               position="top-right"
             />
           </HydrateClient>

@@ -348,10 +348,10 @@ export default function RoomComponent({
     try {
       await joinRoom(socket, roomId);
     } catch {
-      toast.error("Error while joining the room");
+      toast.error("Room not found. Are you in the right room?");
       setTimeout(() => {
         window.location.assign("/");
-      }, 2000);
+      }, 4000);
     }
   }, [roomId]);
 
